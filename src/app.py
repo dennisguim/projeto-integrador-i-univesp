@@ -16,7 +16,30 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- MODELOS (Tabelas) ----
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome_usuario = db.Column(db.String(80), unique=True, nullable=False)
+    senha = db.Column(db.String(120), nullable=False) # Usar hash num projeto real
+    perfil = db.Column(db.String(50), nullable=False) # Chefia ou Consolidador
 
+    def __repr__(self):
+        return f'<Usuario {self.nome_usuario}>'
+
+class Ocorrencia(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    data_inicio = db.Column(db.Date, nullable=False)
+    data_fim = db.Column(db.Date, nullable=False)
+
+    # cria a relacao com a tabela Usuario (chave estrangeira)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+
+    # Acessar o objeto Usuario a partir de uma Ocorrencia
+    usuario = db.relationship('Usuario', backref=db.backref('ocorrencias', lazy=True))
+
+    def __repr__(self):
+        return f'<Ocorrencia {self.descricao}>'
+    
 # ---- ROTAS (PÁGINAS) ----
 @app.route('/')
 def hello_world():
