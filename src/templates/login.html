@@ -1,0 +1,25 @@
+<!-- Diz ao Jinja2 do Flask para usar o base.html como esqueleto -->
+{% extends "base.html" %}
+
+<!-- Define um título específico para esta página -->
+{% block title %}Login{% endblock %}
+
+<!-- Conteúdo principal desta página -->
+{% block content %}
+    <h2>Login de Acesso</h2>
+    <form method="">
+        <div>
+            <label for="username">Usuário:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <br>
+        <div>
+            <label for="password">Senha:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <br>
+        <div>
+            <button type="submit">Entrar</button>
+        </div>
+    </form>
+{% endblock %}

@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask import render_template
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -42,9 +43,6 @@ class Ocorrencia(db.Model):
     
 # ---- ROTAS (PÁGINAS) ----
 @app.route('/')
-def hello_world():
-    return 'Projeto no ar com o banco de dados configurado'
-
-if __name__ == '__main__':
-    app.run(debug=True)
-    
+def index():
+    # render_template busca e processa o arquivo html da pasta templates
+    return render_template('login.html')
