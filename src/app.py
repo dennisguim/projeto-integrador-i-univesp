@@ -46,3 +46,6 @@ class Ocorrencia(db.Model):
 def index():
     # render_template busca e processa o arquivo html da pasta templates
     return render_template('login.html')
+
+if __name__ == '__main__':
+    app.run(debug=True)
