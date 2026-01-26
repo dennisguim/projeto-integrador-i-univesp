@@ -1,0 +1,29 @@
+{% extends "base.html"}
+
+{% block title %}Painel Principal{% endblock %}
+
+{% block content %}
+    <h2>Bem-vindo, {{ current_user.nome_usuario }}!</h2>
+    <p>Seu perfil: <strong>{{ current_user.perfil }}</strong></p>
+
+    <hr>
+
+    {% if current_user.perfil == 'gestor' %}
+        <h3>Painel do Gestor</h3>
+        <ul>
+            <li><a href="#">Gerenciar Setores (Em breve)</a></li>
+            <li><a href="#">Gerenciar Funcionários (Em breve)</a></li>
+            <li><a href="#">Relatório Geral (Em Beve)</a></li>
+        </ul>
+    {% else %}
+        <h3>Painel da Chefia</h3>
+        <ul>
+            <li><a href="#">Minha Equipe (Em breve)</a></li>
+            <li><a href="#">Lançar Frequência (Em breve)</a></li>
+        </ul>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('logout') }}" style="color: red">Sair do Sistema</a>
+{% endblock %}
+
