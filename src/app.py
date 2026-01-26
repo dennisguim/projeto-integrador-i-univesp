@@ -23,24 +23,37 @@ class Usuario(db.Model):
     senha = db.Column(db.String(120), nullable=False) # Usar hash num projeto real
     perfil = db.Column(db.String(50), nullable=False) # Chefia ou Consolidador
 
-    def __repr__(self):
-        return f'<Usuario {self.nome_usuario}>'
+'''    def __repr__(self):
+        return f'<Usuario {self.nome_usuario}>'''
 
-class Ocorrencia(db.Model):
+class Setor(db.Model):
+    # Setores listados na planilha
     id = db.Column(db.Integer, primary_key=True)
-    descricao = db.Column(db.String(200), nullable=False)
-    data_inicio = db.Column(db.Date, nullable=False)
-    data_fim = db.Column(db.Date, nullable=False)
+    nome = db.Column(db.String(100), nullable=False)
+    sigla = db.Column(db.String(50))
+    lotacao = db.Column(db.String(100))
+    chefia_nome = db.Column(db.String(100))
+    chefia_matricula = db.Column(db.String(50))
 
-    # cria a relacao com a tabela Usuario (chave estrangeira)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    #relacionamento com funcionario
+    funcionarios = db.relationship('Funcionario', backref='setor', lazy=True)
 
-    # Acessar o objeto Usuario a partir de uma Ocorrencia
-    usuario = db.relationship('Usuario', backref=db.backref('ocorrencias', lazy=True))
+class Funcionario(db.Model):
+    # Dados cadastrais do funcionario
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(150), nullable=False)
+    siape = db.Column(db.String(20), unique=True, nullable=False)
+    jornada = db.Column(db.String(50))
+    escala = db.Column(db.String(100))
+    trabalho_remoto_integral = db.Column(db.String(10))
+    dias_remoto_revezamento = db.Column(db.String(50))
 
-    def __repr__(self):
-        return f'<Ocorrencia {self.descricao}>'
-    
+    setor_id = db.Column(db.Integer, db.ForeignKey('setor.id'), nullable=False)
+
+    # Relacionamento com Frequencia
+    frequencias = db.relationship('Frequencia', backref='funcionario', lazy=True)
+
+
 # ---- ROTAS (PÁGINAS) ----
 @app.route('/')
 def index():
