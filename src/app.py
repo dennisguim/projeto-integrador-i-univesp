@@ -53,6 +53,15 @@ class Funcionario(db.Model):
     # Relacionamento com Frequencia
     frequencias = db.relationship('Frequencia', backref='funcionario', lazy=True)
 
+class Frequencia(db.Model):
+    # Registro mensal de frequência
+    id = db.Column(db.Integer, primary_key=True)
+    mes = db.Column(db.String(20), nullable=False)
+    ano = db.Column(db.Integer, nullable=False)
+    frequencia_integral = db.Column(db.String(10))
+    observacoes = db.Column(db.Text)
+
+    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
 
 # ---- ROTAS (PÁGINAS) ----
 @app.route('/')
@@ -61,4 +70,6 @@ def index():
     return render_template('login.html')
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
