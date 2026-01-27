@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Frequência{% endblock %}
+
+{% block content %}
+    <h2>Registrar Frequência: {{ funcionario.nome }}</h2>
+    <p>Setor: {{ funcionario.setor.nome }} | SIAPE: {{ funcionario.siape }}</p>
+
+    <form method="post">
+        <div>
+            <label>Mês de Referência:</label><br>
+            <select name="mes" required>
+                <option value="JANEIRO">JANEIRO</option>
+                <option value="FEVEREIRO">FEVEREIRO</option>
+                <option value="MARÇO">MARÇO</option>
+                <option value="ABRIL">ABRIL</option>
+                <option value="MAIO">MAIO</option>
+                <option value="JUNHO">JUNHO</option>
+                <option value="JULHO">JULHO</option>
+                <option value="AGOSTO">AGOSTO</option>
+                <option value="SETEMBRO">SETEMBRO</option>
+                <option value="OUTUBRO">OUTUBRO</option>
+                <option value="NOVEMBRO">NOVEMBRO</option>
+                <option value="DEZEMBRO">DEZEMBRO</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <label>Ano:</label><br>
+            <input type="number" name="ano" value="2026" required>
+        </div>
+        <br>
+        <div>
+            <label>Frequência Integral?</label><br>
+            <select name="frequencia_integral">
+                <option value="SIM">SIM</option>
+                <option value="NÂO">NÂO</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <label>Observações / Ocorrências</label><br>
+            <textarea name="observacoes" rows="4" cols="50" placeholder="Licença médica dia 10. Faltas injustificadas nos dias 12 e 13."></textarea>
+        </div>
+        <br>
+        <button type="submit">Salvar Registro</button>
+    </form>
+
+    <br>
+    <a href="{{ url_for('listar_funcionarios') }}">Voltar</a>
+{% endblock %}

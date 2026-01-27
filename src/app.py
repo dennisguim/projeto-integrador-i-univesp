@@ -34,6 +34,10 @@ class Usuario(UserMixin,db.Model):
     nome_usuario = db.Column(db.String(80), unique=True, nullable=False)
     senha = db.Column(db.String(120), nullable=False) # Usar hash num projeto real
     perfil = db.Column(db.String(50), nullable=False) # Chefia ou Consolidador
+    # adicionado
+    setor_id = db.Column(db.Integer, db.ForeignKey('setor.id'), nullable=True)
+
+    setor_vinculado = db.relationship('Setor', backref='usuarios_gestores')
 
     def __repr__(self):
         return f'<Usuario {self.nome_usuario}>'
