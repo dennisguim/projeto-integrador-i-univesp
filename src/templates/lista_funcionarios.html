@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Funcionários{% endblock %}
+
+{% block content %}
+    <h2>Lista de Funcionários</h2>
+
+    {% if current_user.perfil == 'gestor' %}
+        <a href="{{ url_for('novo_funcionario') }}"><button>+ Novo Funcionário</button></a>
+        <br><br>
+    {% endif %}
+
+    <table border="1" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th>Nome</th>
+                <th>SIAPE</th>
+                <th>Setor</th>
+                <th>Jornada</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for func in funcionarios %}
+            <tr>
+                <td>{{ func.nome }}</td>
+                <td>{{ func.siape }}</td>
+                <td>{{ func.setor.nome }} ({{ func.setor.sigla }})</td>
+                <td>{{ func.jornada }}</td>
+                <td>
+                    <!-- link para edição (a ser implementado) -->
+                     <a href="#">Editar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
+{% endblock %}
