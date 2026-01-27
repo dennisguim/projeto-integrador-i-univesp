@@ -1,4 +1,4 @@
-echo ".venv/" >> .gitignore
-echo "__pychace__/" >> .gitignore
-echo "*.pyc" >> .gitignore
+
+__pychace__/
+*.pyc
 /.venv
