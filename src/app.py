@@ -115,9 +115,46 @@ def logout():
 @app.route('/funcionarios')
 @login_required
 def listar_funcionarios():
+    # se for chefe, ve apenas o setor, se for gestor ve tudo
+    if current_user.perfil == 'chefe' and current_user.setor.id:
+        lista = Funcionario.query.filter_by(setor_id=current_user.setor.id).all()
+    else:
     # Busca todos os funcionários
-    lista = Funcionario.query.all()
+        lista = Funcionario.query.all()
+
     return render_template('lista_funcionarios.html', funcionarios=lista)
+
+@app.route('/funcionarios/frequencia/<int:func_id>', methods=['GET', 'POST'])
+@login_required
+def registrar_frequencia(func_id):
+    funcionario = Funcionario.query.get_or_404(func_id)
+
+    # verificacao de seguranca. chefe só lança para o seu setor
+    if current_user.perfil == 'chefe' and funcionario.setor_id != current_user.setor_id:
+        flash('Acesso negado: Este funcionário não pertence ao seu setor.')
+        return redirect(url_for('listar_funcionarios'))
+    
+    if request.method == 'POST':
+        mes = request.form.get('mes')
+        ano = request.form.get('ano')
+        freq_int = request.form.get('frequencia_integral')
+        obs = request.form.get('observacoes')
+
+        # cria registro de frequencia
+        nova_freq = Frequencia(
+            mes=mes,
+            ano=int(ano),
+            frequencia_integral=freq_int,
+            observacoes=obs,
+            funcionario_id=funcionario.id
+        )
+        db.session.add(nova_freq)
+        db.session.commit()
+
+        flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) registrada!')
+        return redirect(url_for('listar_funcionarios'))
+    
+    return render_template('registrar_frequencia.html', funcionario=funcionario)
 
 @app.route('/funcionarios/novo', methods=['GET', 'POST'])
 @login_required
