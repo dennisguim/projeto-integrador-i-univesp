@@ -97,7 +97,16 @@ def import_data():
             db.session.add(admin)
         
         if not Usuario.query.filter_by(nome_usuario='chefe').first():
-            chefe = Usuario(nome_usuario='chefe', senha='123', perfil='chefe')
+            # Pegamos o primeiro setor cadastrado para vincular ao chefe de teste
+            primeiro_setor = Setor.query.first()
+            setor_id_vinc = primeiro_setor.id if primeiro_setor else None
+            
+            chefe = Usuario(
+                nome_usuario='chefe', 
+                senha='123', 
+                perfil='chefe', 
+                setor_id=setor_id_vinc
+            )
             db.session.add(chefe)
 
         db.session.commit()
