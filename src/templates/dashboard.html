@@ -12,14 +12,14 @@
         <h3>Painel do Gestor</h3>
         <ul>
             <li><a href="#">Gerenciar Setores (Em breve)</a></li>
-            <li><a href="#">Gerenciar Funcionários (Em breve)</a></li>
+            <li><a href="{{ url_for('listar_funcionarios') }}">Gerenciar Funcionários</a></li>
             <li><a href="#">Relatório Geral (Em Beve)</a></li>
         </ul>
     {% else %}
         <h3>Painel da Chefia</h3>
         <ul>
-            <li><a href="#">Minha Equipe (Em breve)</a></li>
-            <li><a href="#">Lançar Frequência (Em breve)</a></li>
+            <li><a href="{{ url_for('listar_funcionarios') }}">Minha Equipe</a></li>
+            <li><a href="{{ url_for('listar_funcionarios') }}">Lançar Frequência</a></li>
         </ul>
     {% endif %}
 

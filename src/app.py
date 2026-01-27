@@ -116,8 +116,8 @@ def logout():
 @login_required
 def listar_funcionarios():
     # se for chefe, ve apenas o setor, se for gestor ve tudo
-    if current_user.perfil == 'chefe' and current_user.setor.id:
-        lista = Funcionario.query.filter_by(setor_id=current_user.setor.id).all()
+    if current_user.perfil == 'chefe' and current_user.setor_id:
+        lista = Funcionario.query.filter_by(setor_id=current_user.setor_id).all()
     else:
     # Busca todos os funcionários
         lista = Funcionario.query.all()
