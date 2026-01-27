@@ -113,7 +113,7 @@ def logout():
 def listar_funcionarios():
     # Busca todos os funcionários
     lista = Funcionario.query.all()
-    return render_template('list_funcionarios.html', funcionarios=lista)
+    return render_template('lista_funcionarios.html', funcionarios=lista)
 
 @app.route('/funcionarios/novo', methods=['GET', 'POST'])
 @login_required
