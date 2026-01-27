@@ -1,0 +1,3 @@
+echo ".venv/" >> .gitignore
+echo "__pychace__/" >> .gitignore
+echo "*.pyc" >> .gitignore
