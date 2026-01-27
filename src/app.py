@@ -108,6 +108,50 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/funcionarios')
+@login_required
+def listar_funcionarios():
+    # Busca todos os funcionários
+    lista = Funcionario.query.all()
+    return render_template('list_funcionarios.html', funcionarios=lista)
+
+@app.route('/funcionarios/novo', methods=['GET', 'POST'])
+@login_required
+def novo_funcionario():
+    # Apenas o gestor pode cadastrar
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado: Apenas gestores podem cadastrar funcionários.')
+        return redirect(url_for('listar_funcionarios'))
+    
+    if request.method == 'POST':
+        # Captura dados do formulário
+        nome = request.form.get('nome').upper()
+        siape = request.form.get('siape')
+        setor_id = request.form.get('setor_id')
+        jornada = request.form.get('jornada')
+        escala = request.form.get('escala')
+        remoto_integral = request.form.get('remoto_integral')
+
+        # salva no banco
+        novo = Funcionario(
+            nome=nome,
+            siape=siape,
+            setor_id=int(setor_id),
+            jornada=jornada,
+            escala=escala,
+            trabalho_remoto_integral=remoto_integral,
+            dias_remoto_revezamento="NÃO" # padrão inicial
+        )
+        db.session.add(novo)
+        db.session.commit()
+
+        flash(f'Funcionário {nome} cadastrado com sucesso!')
+        return redirect(url_for('listar_funcionarios'))
+    
+    # Sefor GET, mostra o formulário (precisa dos setores para o <select>)
+    setores = Setor.query.all()
+    return render_template('form_funcionario.html', setores=setores)
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
