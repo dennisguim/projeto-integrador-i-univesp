@@ -30,6 +30,8 @@
                 <td>
                     <!-- link para edição (a ser implementado) -->
                      <a href="#">Editar</a>
+                    <!-- novo -->
+                     <a href="{{ url_for('registrar_frequencia', func_id=func.id) }}">Lançar Frequência</a>
                 </td>
             </tr>
             {% endfor %}
