@@ -288,11 +288,12 @@ def exportar_relatorio():
     cw = csv.writer(si, delimiter=';') # pode editar depois
 
     # cabecalho
-    cw.writerow(['SETOR', 'LOTAÇÃO', 'SERVIDOR', 'SIAPE', 'REMOTO (REV)', 'FREQ. INTEGRAL', 'OBSERVAÇÕES'])
+    cw.writerow(['SETOR', 'SIGLA', 'LOTAÇÃO', 'SERVIDOR', 'SIAPE', 'REMOTO (REV)', 'FREQ. INTEGRAL', 'OBSERVAÇÕES'])
 
     # dados
     for freq in resultados:
         cw.writerow([
+            freq.funcionario.setor.nome,
             freq.funcionario.setor.sigla,
             freq.funcionario.setor.lotacao,
             freq.funcionario.nome,
@@ -307,6 +308,52 @@ def exportar_relatorio():
     output.headers["Content-type"] = "text/csv"
     return output
 
+@app.route('/setores')
+@login_required
+def listar_setores():
+    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
+    lista = Setor.query.all()
+    return render_template('lista_setores.html', setores=lista)
+
+@app.route('/setores/novo', methods={'GET', 'POST'})
+@login_required
+def novo_setor():
+    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        novo = Setor(
+            nome=request.form.get('nome'),
+            sigla=request.form.get('sigla'),
+            lotacao=request.form.get('lotacao'),
+            chefia_nome=request.form.get('chefia_nome'),
+            chefia_matricula=request.form.get('chefia_matricula')
+        )
+        db.session.add(novo)
+        db.session.commit()
+        flash('Setor criado!')
+        return redirect(url_for('listar_setores'))
+    
+    return render_template('form_setor.html')
+
+@app.route('/usuarios/novo', methods=['GET', 'POST'])
+@login_required
+def novo_usuario():
+    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        novo_user = Usuario(
+            nome_usuario=request.form.get('username'),
+            senha=request.form.get('password'),
+            perfil=request.form.get('perfil'),
+            setor_id=request.form.get('setor_id') if request.form.get('setor_id') else None
+        )
+        db.session.add(novo_user)
+        db.session.commit()
+        flash('Usuário criado com sucesso!')
+        return redirect(url_for('dashboard'))
+        
+    setores = Setor.query.all()
+    return render_template('form_usuario.html', setores=setores)
 
 if __name__ == '__main__':
     with app.app_context():

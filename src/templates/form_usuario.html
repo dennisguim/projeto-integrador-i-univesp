@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Novo Usuário</h2>
+<form method="post">
+    <label>Usuário (Login):</label>
+    <input type="text" name="username" required>
+    
+    <label>Senha:</label>
+    <input type="password" name="password" required>
+    
+    <label>Perfil:</label>
+    <select name="perfil" required>
+        <option value="chefe">Chefe de Setor</option>
+        <option value="gestor">Gestor (Admin)</option>
+    </select>
+    
+    <label>Vincular a Setor (Apenas para Chefes):</label>
+    <select name="setor_id">
+        <option value="">-- Nenhum --</option>
+        {% for s in setores %}
+            <option value="{{ s.id }}">{{ s.nome }}</option>
+        {% endfor %}
+    </select>
+    
+    <button type="submit">Criar Usuário</button>
+</form>
+{% endblock %}
