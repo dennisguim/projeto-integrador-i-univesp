@@ -9,7 +9,7 @@
      <form method="post" style="background-color: #eee; padding: 15px; border-radius: 5px;">
         <label>Mês:</label>
         <select name="mes">
-            {% fot m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
+            {% for m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
                 <option value="{{ m }}" {% if m == mes_atual %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
         </select>
