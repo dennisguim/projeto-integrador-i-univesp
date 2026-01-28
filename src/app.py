@@ -260,7 +260,7 @@ def excluir_funcionario(id):
     # remove as frequencias antes de excluir para evitar erro no bd
     Frequencia.query.filter_by(funcionario_id=id).delete()
 
-    db.session.delete()
+    db.session.delete(func)
     db.session.commit()
 
     flash(f'Funcionário {nome} removido do sistema.')

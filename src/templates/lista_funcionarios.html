@@ -28,10 +28,15 @@
                 <td>{{ func.setor.nome }} ({{ func.setor.sigla }})</td>
                 <td>{{ func.jornada }}</td>
                 <td>
-                    <!-- link para edição (a ser implementado) -->
-                     <a href="#">Editar</a>
-                    <!-- novo -->
-                     <a href="{{ url_for('registrar_frequencia', func_id=func.id) }}">Lançar Frequência</a>
+                    {% if current_user.perfil == 'gestor' %}
+                        <!-- Links de Edição/Exclusão só aparecem para o Gestor -->
+                        <a href="{{ url_for('editar_funcionario', id=func.id) }}">Editar</a> | 
+                        <a href="{{ url_for('excluir_funcionario', id=func.id) }}" 
+                           onclick="return confirm('Tem certeza que deseja excluir este funcionário?')">Excluir</a> |
+                    {% endif %}
+                    
+                    <!-- Link de Frequência aparece para todos (Gestor e Chefe) -->
+                    <a href="{{ url_for('registrar_frequencia', func_id=func.id) }}">Lançar Frequência</a>
                 </td>
             </tr>
             {% endfor %}
