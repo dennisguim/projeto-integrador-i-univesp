@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Novo Setor{% endblock %}
+
+{% block content %}
+    <h2>Cadastrar Novo Setor</h2>
+
+    <form method="post">
+        <label>Nome do Setor:</label>
+        <input type="text" name="nome" required placeholder="EX: Divisão de Enfermagem">
+
+        <label>Sigla:</label>
+        <input type="text" name="sigla" placeholder="Ex: DIENF">
+
+        <label>Lotação:</label>
+        <input type="text" name="lotacao" placeholder="Ex: HCIII">
+
+        <label>Nome da Chefia:</label>
+        <input type="text" name="chefia_nome" required>
+
+        <label>Matrícula da Chefia:</label>
+        <input type="text" name="chefia_matricula">
+
+        <button type="submit">Salvar Setor</button>
+    </form>
+
+    <br>
+    <a href="{{ url_for('listar_setores') }}">Cancelar</a>
+{% endblock %}
