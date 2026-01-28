@@ -22,6 +22,11 @@
      <br>
 
      {% if registros %}
+        <div style="text-align: right; margin-bottom: 10px;">
+            <a href="{{ url_for('exportar_relatorio', mes=mes_atual, ano=ano_atual) }}">
+                <button style="background-color: #2c3e50;">📥 Baixar Excel (.csv)</button>
+            </a>
+        </div>
         <p>Exibindo <strong>{{ registros|length }}</strong> registro para {{ mes_atual }}/{{ ano_atual}}.</p>
     <table border="1" style="width:100%; border-collapse: collapse;">
         <thead>

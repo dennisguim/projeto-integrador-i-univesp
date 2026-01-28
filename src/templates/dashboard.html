@@ -11,7 +11,7 @@
     {% if current_user.perfil == 'gestor' %}
         <h3>Painel do Gestor</h3>
         <ul>
-            <li><a href="#">Gerenciar Setores (Em breve)</a></li>
+            <li><a href="{{ url_for('listar_setores') }}">Gerenciar Setores</a></li>
             <li><a href="{{ url_for('listar_funcionarios') }}">Gerenciar Funcionários</a></li>
             <li><a href="{{ url_for('relatorio_geral') }}">Relatório Geral</a></li>
         </ul>
