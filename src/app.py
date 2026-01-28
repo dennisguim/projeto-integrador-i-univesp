@@ -193,6 +193,36 @@ def novo_funcionario():
     setores = Setor.query.all()
     return render_template('form_funcionario.html', setores=setores)
 
+@app.route('/relatorio', methods=['GET', 'POST'])
+@login_required
+def relatorio_geral():
+    # Apenas o gestor pode ver o relatório geral
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+    
+    # Valores Padrão
+    mes_filtro = 'JANEIRO'
+    ano_filtro = 2026
+    resultados = []
+
+    if request.method == 'POST':
+        mes_filtro = request.form.get('mes')
+        ano_filtro = int(request.form.get('ano'))
+
+        # busca frequencias filtradas por ano e mes
+        # join com funcionario e setor para exibir os dados completos
+        resultados = Frequencia.query\
+            .join(Funcionario)\
+            .join(Setor)\
+            .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)\
+            .all()
+    
+    return render_template('relatorio.html'
+                           registros=resultados,
+                           mes_atual=mes_filtro,
+                           ano_atual=ano_filtro)
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
