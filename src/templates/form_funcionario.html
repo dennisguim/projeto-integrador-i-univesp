@@ -1,39 +1,40 @@
 {% extends "base.html" %}
 
-{% block title %}Cadastrar Funcionário{% endblock %}
+{% block title %}{{ 'Editar' if funcionario else 'Novo' }} Funcionário{% endblock %}
 
 {% block content %}
-    <h2>Novo Funcionário</h2>
+    <h2>{{ 'Editar Dados de ' + funcionario.nome if funcionario else 'Novo Funcionário' }}</h2>
 
     <form method="post">
-        <label for="nome">Nome Completo:</label><br>
-        <input type="text" name="nome" required style="width: 300px;"><br><br>
+        <label>Nome Completo:</label>
+        <input type="text" name="nome" value="{{ funcionario.nome if funcionario }}" required>
 
-        <label for="siape">Matrícula SIAPE:</label><br>
-        <input type="text" name="siape" required><br><br>
+        <label>Matrícula SIAPE:</label>
+        <input type="text" name="siape" value="{{ funcionario.siape if funcionario }}" required>
 
-        <label for="setor">Setor:</label><br>
+        <label>Setor:</label>
         <select name="setor_id" required>
             {% for setor in setores %}
-                <option value="{{ setor.id }}">{{ setor.nome }} - {{ setor.chefia_nome }}</option>
+                <option value="{{ setor.id }}" {{ 'selected' if funcionario and funcionario.setor_id == setor.id }}>
+                    {{ setor.nome }}
+                </option>
             {% endfor %}
-        </select><br><br>
+        </select>
 
-        <label for="jornada">Jornada:</label>
-        <input type="text" name="jornada" placeholder="Ex: 40h"><br><br>
+        <label>Jornada:</label>
+        <input type="text" name="jornada" value="{{ funcionario.jornada if funcionario }}" placeholder="Ex: 40h">
 
-        <label for="escala">Escala:</label>
-        <input type="text" name="escala" placeholder="Ex: 12x36"><br><br>
-
+        <label>Escala:</label>
+        <input type="text" name="escala" value="{{ funcionario.escala if funcionario }}" placeholder="Ex: 12x36">
+        
         <label>Trabalho Remoto Integral?</label>
-        <select name="remoto_integral" id="">
-            <option value="NÂO">NÃO</option>
-            <option value="SIM">SIM</option>
-        </select><br><br>
+        <select name="remoto_integral">
+            <option value="NÃO" {{ 'selected' if funcionario and funcionario.trabalho_remoto_integral == 'NÃO' }}>NÃO</option>
+            <option value="SIM" {{ 'selected' if funcionario and funcionario.trabalho_remoto_integral == 'SIM' }}>SIM</option>
+        </select>
 
-        <button type="submit">Salvar Funcionário</button>
+        <button type="submit">Salvar Alterações</button>
     </form>
-
     <br>
     <a href="{{ url_for('listar_funcionarios') }}">Cancelar</a>
 {% endblock %}
