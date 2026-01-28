@@ -297,7 +297,7 @@ def exportar_relatorio():
         cw.writerow([
             freq.funcionario.setor.nome,
             freq.funcionario.setor.sigla,
-            freq.funcionario.setor.lotacao,
+            freq.funcionario.lotacao,
             freq.funcionario.nome,
             freq.funcionario.siape,
             freq.funcionario.dias_remoto_revezamento,
