@@ -1,0 +1,54 @@
+{% extend "base.html" %}
+
+{% block title %}Relatório Geral{% endblock %}
+
+{% block content %}
+    <h2>Relatório Consolidado de Frequência</h2>
+
+    <!-- Filtro -->
+     <form method="post" style="background-color: #eee; padding: 15px; border-radius: 5px;">
+        <label>Mês:</label>
+        <select name="mes">
+            {% fot m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
+                <option value="{{ m }}" {% if m == mes_atual %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Ano:</label>
+        <input type="number" name="ano" value="{{ ano_atual }}" style="width: 60px;">
+
+        <button type="submit">Gerar Relatório</button>
+     </form>
+     <br>
+
+     {% if registros %}
+        <p>Exibindo <strong>{{ registros|length }}</strong> registro para {{ mes_atual }}/{{ ano_atual}}.</p>
+        <table border="1" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #ddd;">
+                    <th>Setor</th>
+                    <th>Servidor</th>
+                    <th>SIAPE</th>
+                    <th>Freq. Integral</th>
+                    <th>Observações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for freq in registros %}
+                <tr>
+                    <td>{{ freq.funcionario.setor.sigla }}</td>
+                    <td>{{ freq.funcionario.nome }}</td>
+                    <td>{{ freq.funcionario.siape }}</td>
+                    <td style="text-align: center;">{{ freq.frequencia_integral }}</td>
+                    <td>{{ freq.observacoes }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Nenhum registro encontrado para esse período. Selecione outro mês ou certifique-se de que os chefes realizaram os lançamentos</p>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
+{% endblock %}
