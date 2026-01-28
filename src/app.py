@@ -223,6 +223,49 @@ def relatorio_geral():
                            mes_atual=mes_filtro,
                            ano_atual=ano_filtro)
 
+@app.route('/funcionarios/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_funcionario(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        returnredirect(url_for('listar_funcionarios'))
+    
+    func = Funcionario.query.get_or_404(id)
+
+    if request.method == 'POST':
+        func.nome = request.form.get('nome').upper()
+        func.siape = request.form.get('siape')
+        func.setor_id = int(request.form.get('setor_id'))
+        func.jornada = request.form.get('jornada')
+        func.escala = request.form.get('escala')
+        func.trabalho_remoto_integral = request.form.get('remoto_integral')
+
+        db.session.commit()
+        flash(f'Dados de {func.nome} atualizados!')
+        return redirect(url_for('listar_funcionarios'))
+    
+    setores = Setor.query.all()
+    return render_template('form_funcionario.html', setores=setores, funcionario=func)
+
+@app.route('/funcionarios/excluir/<int:id>')
+@login_required
+def excluir_funcionario(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('listar_funcionarios'))
+    
+    func = Funcionario.query.get_or_404(id)
+    nome = func.nome
+
+    # remove as frequencias antes de excluir para evitar erro no bd
+    Frequencia.query.filter_by(funcionario_id=id).delete()
+
+    db.session.delete()
+    db.session.commit()
+
+    flash(f'Funcionário {nome} removido do sistema.')
+    return redirect(url_for('listar_funcionarios'))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
