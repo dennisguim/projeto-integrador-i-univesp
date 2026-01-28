@@ -49,7 +49,6 @@ class Setor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     sigla = db.Column(db.String(50))
-    lotacao = db.Column(db.String(100))
     chefia_nome = db.Column(db.String(100))
     chefia_matricula = db.Column(db.String(50))
 
@@ -61,6 +60,7 @@ class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), nullable=False)
     siape = db.Column(db.String(20), unique=True, nullable=False)
+    lotacao = db.Column(db.String(100))
     jornada = db.Column(db.String(50))
     escala = db.Column(db.String(100))
     trabalho_remoto_integral = db.Column(db.String(10))
@@ -179,6 +179,7 @@ def novo_funcionario():
         novo = Funcionario(
             nome=nome,
             siape=siape,
+            lotacao=request.form.get('lotacao'),
             setor_id=int(setor_id),
             jornada=jornada,
             escala=escala,
@@ -230,13 +231,14 @@ def relatorio_geral():
 def editar_funcionario(id):
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
-        returnredirect(url_for('listar_funcionarios'))
+        return redirect(url_for('listar_funcionarios'))
     
     func = Funcionario.query.get_or_404(id)
 
     if request.method == 'POST':
         func.nome = request.form.get('nome').upper()
         func.siape = request.form.get('siape')
+        func.lotacao = request.form.get('lotacao')
         func.setor_id = int(request.form.get('setor_id'))
         func.jornada = request.form.get('jornada')
         func.escala = request.form.get('escala')
@@ -323,8 +325,7 @@ def novo_setor():
     if request.method == 'POST':
         novo = Setor(
             nome=request.form.get('nome'),
-            sigla=request.form.get('sigla'),
-            lotacao=request.form.get('lotacao'),
+            sigla=request.form.get('sigla'),   
             chefia_nome=request.form.get('chefia_nome'),
             chefia_matricula=request.form.get('chefia_matricula')
         )
