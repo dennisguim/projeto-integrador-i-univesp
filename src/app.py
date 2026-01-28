@@ -218,7 +218,7 @@ def relatorio_geral():
             .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)\
             .all()
     
-    return render_template('relatorio.html'
+    return render_template('relatorio.html',
                            registros=resultados,
                            mes_atual=mes_filtro,
                            ano_atual=ano_filtro)
