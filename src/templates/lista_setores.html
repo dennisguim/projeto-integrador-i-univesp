@@ -22,12 +22,11 @@
             <tr>
                 <td>{{ setor.nome }}</td>
                 <td>{{ setor.sigla }}</td>
-                <td>{{ setor.lotacao }}</td>
+                <!-- <td>{{ setor.lotacao }}</td> -->
                 <td>{{ setor.chefia_nome }} ({{ setor.chefia_matricula }})</td>
                 <td>
                     <a href="{{ url_for('excluir_setor', id=setor.id) }}" onclick="return confirm('Tem certeza? Só é possível excluir setores vazios.')"
-                    style="color: red;">Excluir</a>
-        </td>
+                    style="color: red;">Excluir</a></td>
             </tr>
             {% endfor %}
         </tbody>
