@@ -58,7 +58,6 @@ def import_data():
                 setor = Setor(
                     nome=nome_setor,
                     sigla=sigla,
-                    lotacao=lotacao,
                     chefia_nome=chefia_nome_ref,
                     chefia_matricula=chefia_matricula_ref
                 )
@@ -71,6 +70,7 @@ def import_data():
                 funcionario = Funcionario(
                     nome=nome_func,
                     siape=siape,
+                    lotacao=lotacao,
                     jornada=jornada,
                     escala=escala,
                     trabalho_remoto_integral=remoto_int,
