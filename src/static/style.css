@@ -223,3 +223,8 @@ footer {
     border: 1px solid #ef9a9a;
     margin-bottom: 20px;
 }
+
+/* Ajuste específico para campos de ano/número curtos */
+input[type="number"][style*="width: 60px"] {
+    width: 80px !important; /* Aumenta um pouco para caber 4 dígitos confortavelmente */
+}

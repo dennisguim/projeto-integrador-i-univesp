@@ -23,28 +23,32 @@
 
      {% if registros %}
         <p>Exibindo <strong>{{ registros|length }}</strong> registro para {{ mes_atual }}/{{ ano_atual}}.</p>
-        <table border="1" style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="background-color: #ddd;">
-                    <th>Setor</th>
-                    <th>Servidor</th>
-                    <th>SIAPE</th>
-                    <th>Freq. Integral</th>
-                    <th>Observações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for freq in registros %}
-                <tr>
-                    <td>{{ freq.funcionario.setor.sigla }}</td>
-                    <td>{{ freq.funcionario.nome }}</td>
-                    <td>{{ freq.funcionario.siape }}</td>
-                    <td style="text-align: center;">{{ freq.frequencia_integral }}</td>
-                    <td>{{ freq.observacoes }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <table border="1" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #ddd;">
+                <th>Setor</th>
+                <th>Lotação</th>
+                <th>Servidor</th>
+                <th>SIAPE</th>
+                <th>Remoto (Rev.)</th>
+                <th>Freq. Integral</th>
+                <th>Observações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for freq in registros %}
+            <tr>
+                <td>{{ freq.funcionario.setor.sigla }}</td>
+                <td>{{ freq.funcionario.setor.lotacao }}</td>
+                <td>{{ freq.funcionario.nome }}</td>
+                <td>{{ freq.funcionario.siape }}</td>
+                <td>{{ freq.funcionario.dias_remoto_revezamento }}</td>
+                <td style="text-align: center;">{{ freq.frequencia_integral }}</td>
+                <td>{{ freq.observacoes }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
     {% else %}
         <p>Nenhum registro encontrado para esse período. Selecione outro mês ou certifique-se de que os chefes realizaram os lançamentos</p>
     {% endif %}

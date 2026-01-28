@@ -1,5 +1,7 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+import io
+import csv
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 
@@ -265,6 +267,46 @@ def excluir_funcionario(id):
 
     flash(f'Funcionário {nome} removido do sistema.')
     return redirect(url_for('listar_funcionarios'))
+
+@app.route('/relatorio/exportar')
+@login_required
+def exportar_relatorio():
+    if current_user.perfil != 'gestor':
+        return redirect(url_for('dashboard'))
+    
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+
+    resultados = Frequencia.query\
+        .join(Funcionario)\
+        .join(Setor)\
+        .filter(Frequencia.mes == mes, Frequencia.ano == int(ano))\
+        .all()
+
+    # criacao do csv
+    si = io.StringIO()
+    cw = csv.writer(si, delimiter=';') # pode editar depois
+
+    # cabecalho
+    cw.writerow(['SETOR', 'LOTAÇÃO', 'SERVIDOR', 'SIAPE', 'REMOTO (REV)', 'FREQ. INTEGRAL', 'OBSERVAÇÕES'])
+
+    # dados
+    for freq in resultados:
+        cw.writerow([
+            freq.funcionario.setor.sigla,
+            freq.funcionario.setor.lotacao,
+            freq.funcionario.nome,
+            freq.funcionario.siape,
+            freq.funcionario.dias_remoto_revezamento,
+            freq.frequencia_integral,
+            freq.observacoes
+        ])
+
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = f"attachment; filename=frequencia_{mes}_{ano}.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
 
 if __name__ == '__main__':
     with app.app_context():
