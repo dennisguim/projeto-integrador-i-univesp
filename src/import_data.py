@@ -10,6 +10,9 @@ def import_data():
         print(f"Erro: Arquivo não encontrado em {CSV_PATH}")
         return
 
+    # Garante que as tabelas existem antes de importar
+    db.create_all()
+
     print("Iniciando importação...")
     
     with open(CSV_PATH, newline='', encoding='utf-8') as csvfile:
@@ -52,12 +55,13 @@ def import_data():
             obs = row[11].strip()
 
             # Lógica para evitar duplicar Setores
-            # Verifica se já existe um setor com esse nome E lotação (pois lotação varia)
-            setor = Setor.query.filter_by(nome=nome_setor, lotacao=lotacao).first()
+            # Verifica se já existe um setor com esse nome
+            setor = Setor.query.filter_by(nome=nome_setor).first()
             if not setor:
                 setor = Setor(
                     nome=nome_setor,
                     sigla=sigla,
+                    # lotacao removido
                     chefia_nome=chefia_nome_ref,
                     chefia_matricula=chefia_matricula_ref
                 )

@@ -356,6 +356,23 @@ def novo_usuario():
     setores = Setor.query.all()
     return render_template('form_usuario.html', setores=setores)
 
+@app.route('/setores/excluir/<int:id>')
+@login_required
+def excluir_setor(id):
+    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
+    
+    setor = Setor.query.get_or_404(id)
+    
+    # Verifica se tem funcionários
+    if setor.funcionarios:
+        flash('Erro: Não é possível excluir um setor que possui funcionários vinculados.')
+    else:
+        db.session.delete(setor)
+        db.session.commit()
+        flash(f'Setor {setor.nome} excluído.')
+        
+    return redirect(url_for('listar_setores'))
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
