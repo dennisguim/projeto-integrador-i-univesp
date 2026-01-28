@@ -12,6 +12,9 @@
         <label>Matrícula SIAPE:</label>
         <input type="text" name="siape" value="{{ funcionario.siape if funcionario }}" required>
 
+        <label>Lotação:</label>
+        <input type="text" name="lotacao" placeholder="Ex: HCIII">
+
         <label>Setor:</label>
         <select name="setor_id" required>
             {% for setor in setores %}
