@@ -3,45 +3,106 @@
 {% block title %}Funcionários{% endblock %}
 
 {% block content %}
-    <h2>Lista de Funcionários</h2>
+    <h2>Gerenciar Frequência</h2>
 
     {% if current_user.perfil == 'gestor' %}
-        <a href="{{ url_for('novo_funcionario') }}"><button>+ Novo Funcionário</button></a>
-        <br><br>
+        <div style="margin-bottom: 20px;">
+            <a href="{{ url_for('novo_funcionario') }}"><button>+ Novo Funcionário</button></a>
+        </div>
     {% endif %}
 
-    <table border="1" style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background-color: #f2f2f2;">
-                <th>Nome</th>
-                <th>SIAPE</th>
-                <th>Setor</th>
-                <th>Jornada</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for func in funcionarios %}
-            <tr>
-                <td>{{ func.nome }}</td>
-                <td>{{ func.siape }}</td>
-                <td>{{ func.setor.nome }} ({{ func.setor.sigla }})</td>
-                <td>{{ func.jornada }}</td>
-                <td>
-                    {% if current_user.perfil == 'gestor' %}
-                        <!-- Links de Edição/Exclusão só aparecem para o Gestor -->
-                        <a href="{{ url_for('editar_funcionario', id=func.id) }}">Editar</a> | 
-                        <a href="{{ url_for('excluir_funcionario', id=func.id) }}" 
-                           onclick="return confirm('Tem certeza que deseja excluir este funcionário?')">Excluir</a> |
-                    {% endif %}
-                    
-                    <!-- Link de Frequência aparece para todos (Gestor e Chefe) -->
-                    <a href="{{ url_for('registrar_frequencia', func_id=func.id) }}">Lançar Frequência</a>
-                </td>
-            </tr>
+    <!-- Seletor de Mês/Ano -->
+    <form method="get" style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+        <span style="font-weight: bold; color: #0d47a1;">Período de Referência:</span>
+        
+        <select name="mes" onchange="this.form.submit()" style="padding: 5px;">
+            {% for m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
+                <option value="{{ m }}" {% if m == mes_ref %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
-        </tbody>
-    </table>
+        </select>
+        
+        <input type="number" name="ano" value="{{ ano_ref }}" style="width: 70px; padding: 5px;">
+        <button type="submit" style="background-color: #0d47a1; color: white; border: none; padding: 6px 12px; border-radius: 4px;">Atualizar</button>
+    </form>
+
+    <!-- Lista de Pendentes -->
+    <h3 style="color: #d32f2f;">🔻 Pendentes ({{ pendentes|length }})</h3>
+    {% if pendentes %}
+        <table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+            <thead>
+                <tr style="background-color: #ffebee;">
+                    <th>Nome</th>
+                    <th>SIAPE</th>
+                    <th>Setor</th>
+                    <th>Jornada</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for func in pendentes %}
+                <tr>
+                    <td>{{ func.nome }}</td>
+                    <td>{{ func.siape }}</td>
+                    <td>{{ func.setor.nome }} ({{ func.setor.sigla }})</td>
+                    <td>{{ func.jornada }}</td>
+                    <td>
+                        <a href="{{ url_for('registrar_frequencia', func_id=func.id) }}?mes={{ mes_ref }}&ano={{ ano_ref }}">
+                            <button style="background-color: #d32f2f; color: white; border: none; padding: 5px 10px; cursor: pointer;">Lançar Frequência</button>
+                        </a>
+                        {% if current_user.perfil == 'gestor' %}
+                            | <a href="{{ url_for('editar_funcionario', id=func.id) }}">Editar</a> 
+                            | <a href="{{ url_for('excluir_funcionario', id=func.id) }}" onclick="return confirm('Excluir funcionário?')">Excluir</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color: grey; font-style: italic;">Todos os funcionários já possuem frequência lançada para este período!</p>
+    {% endif %}
+
+    <hr>
+
+    <!-- Lista de Concluídos -->
+    <h3 style="color: #388e3c;">✅ Frequência Lançada ({{ concluidos|length }})</h3>
+    {% if concluidos %}
+        <table border="1" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #e8f5e9;">
+                    <th>Nome</th>
+                    <th>Setor</th>
+                    <th>Freq. Integral</th>
+                    <th>Observações</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for func in concluidos %}
+                <tr>
+                    <td>{{ func.nome }}</td>
+                    <td>{{ func.setor.sigla }}</td>
+                    <td style="text-align: center;">
+                        {% if func.freq_registrada.frequencia_integral == 'SIM' %}
+                            <span style="color: green; font-weight: bold;">SIM</span>
+                        {% else %}
+                            <span style="color: red; font-weight: bold;">{{ func.freq_registrada.frequencia_integral }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ func.freq_registrada.observacoes }}</td>
+                    <td>
+                        <span style="color: green;">Lançado ✔</span>
+                        {% if current_user.perfil == 'gestor' %}
+                             | <a href="{{ url_for('editar_funcionario', id=func.id) }}">Editar Func.</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color: grey;">Nenhuma frequência lançada ainda para este período.</p>
+    {% endif %}
 
     <br>
     <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
