@@ -3,7 +3,10 @@
 {% block title %}Funcionários{% endblock %}
 
 {% block content %}
-    <h2>Gerenciar Frequência</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Gerenciar Frequência</h2>
+        <a href="{{ url_for('dashboard') }}"><button type="button">Voltar ao Painel</button></a>
+    </div>
 
     {% if current_user.perfil == 'gestor' %}
         <div style="margin-bottom: 20px;">

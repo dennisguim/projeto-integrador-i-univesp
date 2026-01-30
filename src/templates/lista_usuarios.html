@@ -3,7 +3,10 @@
 {% block title %}Usuários{% endblock %}
 
 {% block content %}
-    <h2>Gerenciar Usuários</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Gerenciar Usuários</h2>
+        <a href="{{ url_for('dashboard') }}"><button type="button">Voltar ao Painel</button></a>
+    </div>
 
     <a href="{{ url_for('novo_usuario') }}"><button>+ Novo Usuário</button></a>
     <br><br>

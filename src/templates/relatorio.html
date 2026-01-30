@@ -3,7 +3,10 @@
 {% block title %}Relatório Geral{% endblock %}
 
 {% block content %}
-    <h2>Relatório Consolidado de Frequência</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Relatório Consolidado de Frequência</h2>
+        <a href="{{ url_for('dashboard') }}"><button type="button">Voltar ao Painel</button></a>
+    </div>
 
     <!-- Filtro Avançado -->
     <form method="get" style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end;">
