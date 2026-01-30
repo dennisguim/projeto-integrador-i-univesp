@@ -5,57 +5,114 @@
 {% block content %}
     <h2>Relatório Consolidado de Frequência</h2>
 
-    <!-- Filtro -->
-     <form method="post" style="background-color: #eee; padding: 15px; border-radius: 5px;">
-        <label>Mês:</label>
-        <select name="mes">
-            {% for m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
-                <option value="{{ m }}" {% if m == mes_atual %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-        </select>
+    <!-- Filtro Avançado -->
+    <form method="get" style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; align-items: end;">
+        
+        <!-- Mês -->
+        <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Mês:</label>
+            <select name="mes" style="width: 100%; padding: 8px;">
+                {% for m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
+                    <option value="{{ m }}" {% if m == filtros.mes %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
-        <label>Ano:</label>
-        <input type="number" name="ano" value="{{ ano_atual }}" style="width: 60px;">
+        <!-- Ano -->
+        <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ano:</label>
+            <input type="number" name="ano" value="{{ filtros.ano }}" style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
 
-        <button type="submit">Gerar Relatório</button>
-     </form>
-     <br>
+        <!-- Setor -->
+        <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Setor:</label>
+            <select name="setor_id" style="width: 100%; padding: 8px;">
+                <option value="">-- Todos os Setores --</option>
+                {% for s in setores %}
+                    <option value="{{ s.id }}" {% if filtros.setor_id == s.id %}selected{% endif %}>
+                        {{ s.sigla }} - {{ s.nome }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
-     {% if registros %}
-        <div style="text-align: right; margin-bottom: 10px;">
-            <a href="{{ url_for('exportar_relatorio', mes=mes_atual, ano=ano_atual) }}">
-                <button style="background-color: #2c3e50;">📥 Baixar Excel (.csv)</button>
+        <!-- Nome / SIAPE -->
+        <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nome ou SIAPE:</label>
+            <input type="text" name="nome" value="{{ filtros.nome }}" placeholder="Buscar funcionário..." style="width: 100%; padding: 8px; box-sizing: border-box;">
+        </div>
+
+        <!-- Frequência Integral -->
+        <div>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Freq. Integral:</label>
+            <select name="freq_integral" style="width: 100%; padding: 8px;">
+                <option value="">-- Todos --</option>
+                <option value="SIM" {% if filtros.freq_integral == 'SIM' %}selected{% endif %}>SIM</option>
+                <option value="NÃO" {% if filtros.freq_integral == 'NÃO' %}selected{% endif %}>NÃO</option>
+                <option value="PARCIAL" {% if filtros.freq_integral == 'PARCIAL' %}selected{% endif %}>PARCIAL</option>
+            </select>
+        </div>
+
+        <!-- Botões -->
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">🔍 Filtrar</button>
+            <a href="{{ url_for('relatorio_geral') }}" style="text-decoration: none;">
+                <button type="button" style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Limpar</button>
             </a>
         </div>
-        <p>Exibindo <strong>{{ registros|length }}</strong> registro para {{ mes_atual }}/{{ ano_atual}}.</p>
-    <table border="1" style="width:100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background-color: #ddd;">
-                <th>Setor</th>
-                <th>Lotação</th>
-                <th>Servidor</th>
-                <th>SIAPE</th>
-                <th>Remoto (Rev.)</th>
-                <th>Freq. Integral</th>
-                <th>Observações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for freq in registros %}
-            <tr>
-                <td>{{ freq.funcionario.setor.sigla }}</td>
-                <td>{{ freq.funcionario.lotacao }}</td>
-                <td>{{ freq.funcionario.nome }}</td>
-                <td>{{ freq.funcionario.siape }}</td>
-                <td>{{ freq.funcionario.dias_remoto_revezamento }}</td>
-                <td style="text-align: center;">{{ freq.frequencia_integral }}</td>
-                <td>{{ freq.observacoes }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    </form>
+    <br>
+
+    {% if registros %}
+        <div style="text-align: right; margin-bottom: 10px;">
+            <!-- O link de exportação inclui todos os parâmetros atuais da URL (filtros) -->
+            <a href="{{ url_for('exportar_relatorio', **filtros) }}">
+                <button style="background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">📥 Baixar Excel (.csv)</button>
+            </a>
+        </div>
+
+        <p>Exibindo <strong>{{ registros|length }}</strong> registros encontrados.</p>
+        <table border="1" style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #e9ecef;">
+                    <th>Setor</th>
+                    <th>Sigla</th>
+                    <th>Lotação</th>
+                    <th>Servidor</th>
+                    <th>SIAPE</th>
+                    <th>Remoto (Rev.)</th>
+                    <th>Freq. Integral</th>
+                    <th>Observações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for freq in registros %}
+                <tr>
+                    <td>{{ freq.funcionario.setor.nome }}</td>
+                    <td>{{ freq.funcionario.setor.sigla }}</td>
+                    <td>{{ freq.funcionario.lotacao }}</td>
+                    <td>{{ freq.funcionario.nome }}</td>
+                    <td>{{ freq.funcionario.siape }}</td>
+                    <td>{{ freq.funcionario.dias_remoto_revezamento }}</td>
+                    <td style="text-align: center;">
+                        {% if freq.frequencia_integral == 'SIM' %}
+                            <span style="color: green; font-weight: bold;">SIM</span>
+                        {% elif freq.frequencia_integral == 'NÃO' %}
+                            <span style="color: red; font-weight: bold;">NÃO</span>
+                        {% else %}
+                            <span style="color: orange; font-weight: bold;">{{ freq.frequencia_integral }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ freq.observacoes }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% else %}
-        <p>Nenhum registro encontrado para esse período. Selecione outro mês ou certifique-se de que os chefes realizaram os lançamentos</p>
+        <div style="text-align: center; padding: 40px; background-color: #fff; border: 1px dashed #ccc;">
+            <p>Nenhum registro encontrado com os filtros selecionados.</p>
+        </div>
     {% endif %}
 
     <br>
