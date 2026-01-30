@@ -373,6 +373,78 @@ def excluir_setor(id):
         
     return redirect(url_for('listar_setores'))
 
+@app.route('/usuarios')
+@login_required
+def listar_usuarios():
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+    
+    lista = Usuario.query.all()
+    return render_template('lista_usuarios.html', usuarios=lista)
+
+@app.route('/usuarios/excluir/<int:id>')
+@login_required
+def excluir_usuario(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+    
+    if id == current_user.id:
+        flash('Erro: Você não pode excluir seu próprio usuário.')
+        return redirect(url_for('listar_usuarios'))
+
+    user = Usuario.query.get_or_404(id)
+    nome = user.nome_usuario
+    db.session.delete(user)
+    db.session.commit()
+    
+    flash(f'Usuário {nome} excluído com sucesso.')
+    return redirect(url_for('listar_usuarios'))
+
+@app.route('/usuarios/alterar_senha/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_alterar_senha(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+
+    user = Usuario.query.get_or_404(id)
+
+    if request.method == 'POST':
+        nova_senha = request.form.get('nova_senha')
+        if nova_senha:
+            user.senha = nova_senha # Em produção usar hash
+            db.session.commit()
+            flash(f'Senha de {user.nome_usuario} alterada com sucesso!')
+            return redirect(url_for('listar_usuarios'))
+        else:
+            flash('A senha não pode ser vazia.')
+
+    return render_template('alterar_senha.html', usuario=user)
+
+@app.route('/minha_conta/alterar_senha', methods=['GET', 'POST'])
+@login_required
+def minha_senha():
+    if request.method == 'POST':
+        senha_atual = request.form.get('senha_atual')
+        nova_senha = request.form.get('nova_senha')
+        confirmar = request.form.get('confirmar_senha')
+
+        if current_user.senha != senha_atual:
+            flash('Senha atual incorreta.')
+        elif nova_senha != confirmar:
+            flash('A nova senha e a confirmação não coincidem.')
+        elif not nova_senha:
+             flash('A nova senha não pode ser vazia.')
+        else:
+            current_user.senha = nova_senha
+            db.session.commit()
+            flash('Sua senha foi alterada com sucesso!')
+            return redirect(url_for('dashboard'))
+            
+    return render_template('minha_senha.html')
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
