@@ -196,35 +196,57 @@ def novo_funcionario():
     setores = Setor.query.all()
     return render_template('form_funcionario.html', setores=setores)
 
-@app.route('/relatorio', methods=['GET', 'POST'])
+@app.route('/relatorio', methods=['GET'])
 @login_required
 def relatorio_geral():
-    # Apenas o gestor pode ver o relatório geral
+    # Apenas gestor pode ver relatório geral
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
-    
-    # Valores Padrão
-    mes_filtro = 'JANEIRO'
-    ano_filtro = 2026
-    resultados = []
 
-    if request.method == 'POST':
-        mes_filtro = request.form.get('mes')
-        ano_filtro = int(request.form.get('ano'))
+    # Valores padrão para filtros (agora via GET)
+    mes_filtro = request.args.get('mes', 'JANEIRO')
+    ano_filtro = request.args.get('ano', 2026, type=int)
+    setor_id = request.args.get('setor_id', type=int)
+    nome_busca = request.args.get('nome', '').strip()
+    freq_integral_filtro = request.args.get('freq_integral', '')
 
-        # busca frequencias filtradas por ano e mes
-        # join com funcionario e setor para exibir os dados completos
-        resultados = Frequencia.query\
-            .join(Funcionario)\
-            .join(Setor)\
-            .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)\
-            .all()
+    # Query Base (Filtro de tempo é obrigatório)
+    query = Frequencia.query\
+        .join(Funcionario)\
+        .join(Setor)\
+        .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
     
-    return render_template('relatorio.html',
-                           registros=resultados,
-                           mes_atual=mes_filtro,
-                           ano_atual=ano_filtro)
+    # Filtros Adicionais (Opcionais)
+    if setor_id:
+        query = query.filter(Funcionario.setor_id == setor_id)
+    
+    if nome_busca:
+        # Filtra por Nome ou SIAPE
+        query = query.filter(
+            (Funcionario.nome.contains(nome_busca.upper())) | 
+            (Funcionario.siape.contains(nome_busca))
+        )
+    
+    if freq_integral_filtro:
+        query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
+
+    resultados = query.all()
+    setores = Setor.query.order_by(Setor.nome).all()
+
+    # Passamos os filtros atuais para manter o formulário preenchido
+    filtros_atuais = {
+        'mes': mes_filtro,
+        'ano': ano_filtro,
+        'setor_id': setor_id,
+        'nome': nome_busca,
+        'freq_integral': freq_integral_filtro
+    }
+
+    return render_template('relatorio.html', 
+                           registros=resultados, 
+                           setores=setores,
+                           filtros=filtros_atuais)
 
 @app.route('/funcionarios/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -275,24 +297,39 @@ def excluir_funcionario(id):
 def exportar_relatorio():
     if current_user.perfil != 'gestor':
         return redirect(url_for('dashboard'))
-    
-    mes = request.args.get('mes')
-    ano = request.args.get('ano')
 
-    resultados = Frequencia.query\
+    # Recupera os mesmos filtros da URL (request.args)
+    mes_filtro = request.args.get('mes')
+    ano_filtro = request.args.get('ano', type=int)
+    setor_id = request.args.get('setor_id', type=int)
+    nome_busca = request.args.get('nome', '').strip()
+    freq_integral_filtro = request.args.get('freq_integral', '')
+
+    query = Frequencia.query\
         .join(Funcionario)\
         .join(Setor)\
-        .filter(Frequencia.mes == mes, Frequencia.ano == int(ano))\
-        .all()
+        .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
 
-    # criacao do csv
+    if setor_id:
+        query = query.filter(Funcionario.setor_id == setor_id)
+    if nome_busca:
+        query = query.filter(
+            (Funcionario.nome.contains(nome_busca.upper())) | 
+            (Funcionario.siape.contains(nome_busca))
+        )
+    if freq_integral_filtro:
+        query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
+
+    resultados = query.all()
+
+    # Criação do CSV em memória
     si = io.StringIO()
-    cw = csv.writer(si, delimiter=';') # pode editar depois
-
-    # cabecalho
+    cw = csv.writer(si, delimiter=';') 
+    
+    # Cabeçalho
     cw.writerow(['SETOR', 'SIGLA', 'LOTAÇÃO', 'SERVIDOR', 'SIAPE', 'REMOTO (REV)', 'FREQ. INTEGRAL', 'OBSERVAÇÕES'])
-
-    # dados
+    
+    # Dados
     for freq in resultados:
         cw.writerow([
             freq.funcionario.setor.nome,
@@ -306,7 +343,7 @@ def exportar_relatorio():
         ])
 
     output = make_response(si.getvalue())
-    output.headers["Content-Disposition"] = f"attachment; filename=frequencia_{mes}_{ano}.csv"
+    output.headers["Content-Disposition"] = f"attachment; filename=frequencia_{mes_filtro}_{ano_filtro}.csv"
     output.headers["Content-type"] = "text/csv"
     return output
 
