@@ -13,7 +13,7 @@
         <ul>
             <li><a href="{{ url_for('listar_setores') }}">Gerenciar Setores</a></li>
             <li><a href="{{ url_for('listar_funcionarios') }}">Gerenciar Funcionários</a></li>
-            <li><a href="{{ url_for('novo_usuario') }}">Gerenciar Usuários (Cadastrar)</a></li>
+            <li><a href="{{ url_for('listar_usuarios') }}">Gerenciar Usuários</a></li>
             <li><a href="{{ url_for('relatorio_geral') }}">Relatório Geral</a></li>
         </ul>
     {% else %}
@@ -25,6 +25,7 @@
     {% endif %}
 
     <br>
+    <p><a href="{{ url_for('minha_senha') }}">Alterar Minha Senha</a></p>
     <a href="{{ url_for('logout') }}" style="color: red">Sair do Sistema</a>
 {% endblock %}
 
