@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários{% endblock %}
+
+{% block content %}
+    <h2>Gerenciar Usuários</h2>
+
+    <a href="{{ url_for('novo_usuario') }}"><button>+ Novo Usuário</button></a>
+    <br><br>
+
+    <table border="1" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th>ID</th>
+                <th>Usuário (Login)</th>
+                <th>Perfil</th>
+                <th>Setor Vinculado</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in usuarios %}
+            <tr>
+                <td>{{ u.id }}</td>
+                <td>{{ u.nome_usuaroi }}</td>
+                <td>{{ u.perfil }}</td>
+                <td>
+                    {% if u.setor_vinculado %}
+                        {{ u.setor_vinculado.nome}} ({{ u.setor_vinculado.sigla }})
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('admin_alterar_senha', id=u.id) }}">Alterar Senha</a>
+                    {% if u.id != current_user.id %}
+                        <a href="{{ url_for('excluir_usuario', id=u.id) }}" onclick="return confirm ('Tem certeza que deseja excluir este usuário? A ação não pode ser desfeita.')">Excluir</a>
+                    {% else %}
+                        <span style="color: grey;">Excluir</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br><a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
+{% endblock %}
