@@ -114,17 +114,43 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/funcionarios')
+@app.route('/funcionarios', methods=['GET'])
 @login_required
 def listar_funcionarios():
-    # se for chefe, ve apenas o setor, se for gestor ve tudo
-    if current_user.perfil == 'chefe' and current_user.setor_id:
-        lista = Funcionario.query.filter_by(setor_id=current_user.setor_id).all()
-    else:
-    # Busca todos os funcionários
-        lista = Funcionario.query.all()
+    # Parâmetros de Filtro (Mês/Ano referência para saber quem já lançou)
+    mes_ref = request.args.get('mes', 'JANEIRO')
+    ano_ref = request.args.get('ano', 2026, type=int)
 
-    return render_template('lista_funcionarios.html', funcionarios=lista)
+    # 1. Buscar todos os funcionários acessíveis ao usuário
+    if current_user.perfil == 'chefe' and current_user.setor_id:
+        todos_funcionarios = Funcionario.query.filter_by(setor_id=current_user.setor_id).order_by(Funcionario.nome).all()
+    else:
+        todos_funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
+
+    # 2. Separar em duas listas: Pendentes e Concluídos
+    pendentes = []
+    concluidos = []
+
+    for func in todos_funcionarios:
+        # Verifica se existe frequência para este funcionário no mês/ano selecionado
+        freq = Frequencia.query.filter_by(
+            funcionario_id=func.id,
+            mes=mes_ref,
+            ano=ano_ref
+        ).first()
+
+        if freq:
+            # Adiciona um atributo temporário para exibir no template se necessário
+            func.freq_registrada = freq 
+            concluidos.append(func)
+        else:
+            pendentes.append(func)
+
+    return render_template('lista_funcionarios.html', 
+                           pendentes=pendentes, 
+                           concluidos=concluidos,
+                           mes_ref=mes_ref,
+                           ano_ref=ano_ref)
 
 @app.route('/funcionarios/frequencia/<int:func_id>', methods=['GET', 'POST'])
 @login_required
@@ -136,27 +162,47 @@ def registrar_frequencia(func_id):
         flash('Acesso negado: Este funcionário não pertence ao seu setor.')
         return redirect(url_for('listar_funcionarios'))
     
+    # Se receber via GET (clique no botão da lista), preenchemos o formulário
+    mes_selecionado = request.args.get('mes')
+    ano_selecionado = request.args.get('ano')
+    
     if request.method == 'POST':
         mes = request.form.get('mes')
         ano = request.form.get('ano')
         freq_int = request.form.get('frequencia_integral')
         obs = request.form.get('observacoes')
 
-        # cria registro de frequencia
-        nova_freq = Frequencia(
+        # Verifica se já existe (Evitar duplicidade manual ou atualizar existente)
+        existente = Frequencia.query.filter_by(
+            funcionario_id=funcionario.id,
             mes=mes,
-            ano=int(ano),
-            frequencia_integral=freq_int,
-            observacoes=obs,
-            funcionario_id=funcionario.id
-        )
-        db.session.add(nova_freq)
+            ano=int(ano)
+        ).first()
+
+        if existente:
+             existente.frequencia_integral = freq_int
+             existente.observacoes = obs
+             flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) atualizada!')
+        else:
+            nova_freq = Frequencia(
+                mes=mes,
+                ano=int(ano),
+                frequencia_integral=freq_int,
+                observacoes=obs,
+                funcionario_id=funcionario.id
+            )
+            db.session.add(nova_freq)
+            flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) registrada!')
+            
         db.session.commit()
 
-        flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) registrada!')
-        return redirect(url_for('listar_funcionarios'))
+        # Retorna para a lista mantendo o filtro de mês/ano, para ver o func cair na lista de concluídos
+        return redirect(url_for('listar_funcionarios', mes=mes, ano=ano))
     
-    return render_template('registrar_frequencia.html', funcionario=funcionario)
+    return render_template('registrar_frequencia.html', 
+                           funcionario=funcionario,
+                           mes_padrao=mes_selecionado,
+                           ano_padrao=ano_selecionado)
 
 @app.route('/funcionarios/novo', methods=['GET', 'POST'])
 @login_required
