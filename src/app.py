@@ -360,54 +360,55 @@ def exportar_relatorio():
     if current_user.perfil != 'gestor':
         return redirect(url_for('dashboard'))
 
-    # Recupera os mesmos filtros da URL
+    # 1. Recuperar dados filtrados
     mes_filtro = request.args.get('mes')
     ano_filtro = request.args.get('ano', type=int)
     setor_id = request.args.get('setor_id', type=int)
     nome_busca = request.args.get('nome', '').strip()
     freq_integral_filtro = request.args.get('freq_integral', '')
 
-    query = Frequencia.query\
-        .join(Funcionario)\
-        .join(Setor)\
-        .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
-
-    if setor_id:
-        query = query.filter(Funcionario.setor_id == setor_id)
-    if nome_busca:
-        query = query.filter(
-            (Funcionario.nome.contains(nome_busca.upper())) | 
-            (Funcionario.siape.contains(nome_busca))
-        )
-    if freq_integral_filtro:
-        query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
+    query = Frequencia.query.join(Funcionario).join(Setor).filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
+    if setor_id: query = query.filter(Funcionario.setor_id == setor_id)
+    if nome_busca: query = query.filter((Funcionario.nome.contains(nome_busca.upper())) | (Funcionario.siape.contains(nome_busca)))
+    if freq_integral_filtro: query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
 
     resultados = query.all()
 
-    # Criação do CSV em memória
-    si = io.StringIO()
-    cw = csv.writer(si, delimiter=';') # Ponto e vírgula é melhor para Excel BR
-    
-    # Cabeçalho
-    cw.writerow(['SETOR', 'SIGLA', 'LOTAÇÃO', 'SERVIDOR', 'SIAPE', 'REMOTO (REV)', 'FREQ. INTEGRAL', 'OBSERVAÇÕES'])
-    
-    # Dados
-    for freq in resultados:
-        cw.writerow([
-            freq.funcionario.setor.nome,
-            freq.funcionario.setor.sigla,
-            freq.funcionario.lotacao,
-            freq.funcionario.nome,
-            freq.funcionario.siape,
-            freq.funcionario.dias_remoto_revezamento,
-            freq.frequencia_integral,
-            freq.observacoes
-        ])
+    # 2. Manipular Excel com Modelo Local
+    caminho_modelo = os.path.join(app.static_folder, 'modelo_frequencia.xlsx')
+    wb = openpyxl.load_workbook(caminho_modelo)
+    ws = wb.active
 
-    output = make_response(si.getvalue())
-    output.headers["Content-Disposition"] = f"attachment; filename=frequencia_{mes_filtro}_{ano_filtro}.csv"
-    output.headers["Content-type"] = "text/csv"
-    return output
+    # Ajuste de linhas se necessário
+    num_registros = len(resultados)
+    if num_registros > 188:
+        ws.insert_rows(193, num_registros - 188)
+
+    # Preencher dados (B=2 até L=12)
+    # Ordem: SETOR;SIGLA;LOTAÇÃO;SIAPE;NOME;JORNADA;ESCALA;REMOTO_INT;REMOTO_REV;FREQ_INT;OBS
+    for i, freq in enumerate(resultados):
+        row = 5 + i
+        ws.cell(row=row, column=2).value = freq.funcionario.setor.nome
+        ws.cell(row=row, column=3).value = freq.funcionario.setor.sigla
+        ws.cell(row=row, column=4).value = freq.funcionario.lotacao
+        ws.cell(row=row, column=5).value = freq.funcionario.siape
+        ws.cell(row=row, column=6).value = freq.funcionario.nome
+        ws.cell(row=row, column=7).value = freq.funcionario.jornada
+        ws.cell(row=row, column=8).value = freq.funcionario.escala
+        ws.cell(row=row, column=9).value = freq.funcionario.trabalho_remoto_integral
+        ws.cell(row=row, column=10).value = freq.funcionario.dias_remoto_revezamento
+        ws.cell(row=row, column=11).value = freq.frequencia_integral
+        ws.cell(row=row, column=12).value = freq.observacoes
+
+    # 3. Retornar Excel
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = f"attachment; filename=frequencia_{mes_filtro}_{ano_filtro}.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
 
 @app.route('/setores/excluir/<int:id>')
 @login_required
@@ -627,17 +628,21 @@ def exportar_google_sheets():
         linhas_extras = num_registros - limite_padrao
         ws.insert_rows(193, linhas_extras) # Insere a partir da 193 (antes das instruções)
 
-    # Preencher dados a partir da linha 5
+    # Preencher dados (B=2 até L=12)
+    # Ordem: SETOR;SIGLA;LOTAÇÃO;SIAPE;NOME;JORNADA;ESCALA;REMOTO_INT;REMOTO_REV;FREQ_INT;OBS
     for i, freq in enumerate(resultados):
         row = 5 + i
-        ws.cell(row=row, column=1).value = freq.funcionario.setor.nome
-        ws.cell(row=row, column=2).value = freq.funcionario.setor.sigla
-        ws.cell(row=row, column=3).value = freq.funcionario.lotacao
-        ws.cell(row=row, column=4).value = freq.funcionario.nome
+        ws.cell(row=row, column=2).value = freq.funcionario.setor.nome
+        ws.cell(row=row, column=3).value = freq.funcionario.setor.sigla
+        ws.cell(row=row, column=4).value = freq.funcionario.lotacao
         ws.cell(row=row, column=5).value = freq.funcionario.siape
-        ws.cell(row=row, column=6).value = freq.funcionario.dias_remoto_revezamento
-        ws.cell(row=row, column=7).value = freq.frequencia_integral
-        ws.cell(row=row, column=8).value = freq.observacoes
+        ws.cell(row=row, column=6).value = freq.funcionario.nome
+        ws.cell(row=row, column=7).value = freq.funcionario.jornada
+        ws.cell(row=row, column=8).value = freq.funcionario.escala
+        ws.cell(row=row, column=9).value = freq.funcionario.trabalho_remoto_integral
+        ws.cell(row=row, column=10).value = freq.funcionario.dias_remoto_revezamento
+        ws.cell(row=row, column=11).value = freq.frequencia_integral
+        ws.cell(row=row, column=12).value = freq.observacoes
 
     # Salva em arquivo temporário
     with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
