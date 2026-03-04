@@ -1,4 +1,6 @@
-
-__pychace__/
+__pycache__/
 *.pyc
 /.venv
+client_secret.json
+.env
+database.db
