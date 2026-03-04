@@ -68,10 +68,15 @@
     <br>
 
     {% if registros %}
-        <div style="text-align: right; margin-bottom: 10px;">
+        <div style="text-align: right; margin-bottom: 10px; display: flex; justify-content: flex-end; gap: 10px;">
             <!-- O link de exportação inclui todos os parâmetros atuais da URL (filtros) -->
             <a href="{{ url_for('exportar_relatorio', **filtros) }}">
                 <button style="background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">📥 Baixar Excel (.csv)</button>
+            </a>
+
+            <!-- NOVO Botão Google Sheets -->
+            <a href="{{ url_for('exportar_google_sheets', **filtros) }}">
+                <button type="button" style="background-color: #4285F4; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">📊 Salvar no Google Planilhas</button>
             </a>
         </div>
 

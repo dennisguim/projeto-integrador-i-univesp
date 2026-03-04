@@ -1,13 +1,26 @@
 import os
 import io
 import csv
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response
+import tempfile
+import openpyxl
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+
+# Importações para Google API
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
+
+# Configurações do Google API
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # Apenas para desenvolvimento local (HTTP)
+CLIENT_SECRETS_FILE = os.path.join(os.path.abspath(os.path.join(basedir, os.pardir)), 'client_secret.json')
 
 # Configurações do banco de dados
 #Necessário para login e sessão
@@ -49,6 +62,7 @@ class Setor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     sigla = db.Column(db.String(50))
+    lotacao = db.Column(db.String(100))
     chefia_nome = db.Column(db.String(100))
     chefia_matricula = db.Column(db.String(50))
 
@@ -60,7 +74,7 @@ class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), nullable=False)
     siape = db.Column(db.String(20), unique=True, nullable=False)
-    lotacao = db.Column(db.String(100))
+    lotacao = db.Column(db.String(100)) # Adicionado
     jornada = db.Column(db.String(50))
     escala = db.Column(db.String(100))
     trabalho_remoto_integral = db.Column(db.String(10))
@@ -172,7 +186,7 @@ def registrar_frequencia(func_id):
         freq_int = request.form.get('frequencia_integral')
         obs = request.form.get('observacoes')
 
-        # Verifica se já existe (Evitar duplicidade manual ou atualizar existente)
+        # Verifica se já existe (Evitar duplicidade manual)
         existente = Frequencia.query.filter_by(
             funcionario_id=funcionario.id,
             mes=mes,
@@ -180,10 +194,12 @@ def registrar_frequencia(func_id):
         ).first()
 
         if existente:
+             # Atualiza em vez de criar novo (ou avisa erro, dependendo da regra. Aqui vou atualizar)
              existente.frequencia_integral = freq_int
              existente.observacoes = obs
              flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) atualizada!')
         else:
+            # cria registro de frequencia
             nova_freq = Frequencia(
                 mes=mes,
                 ano=int(ano),
@@ -196,7 +212,7 @@ def registrar_frequencia(func_id):
             
         db.session.commit()
 
-        # Retorna para a lista mantendo o filtro de mês/ano, para ver o func cair na lista de concluídos
+        # Retorna para a lista mantendo o filtro de mês/ano
         return redirect(url_for('listar_funcionarios', mes=mes, ano=ano))
     
     return render_template('registrar_frequencia.html', 
@@ -242,6 +258,50 @@ def novo_funcionario():
     setores = Setor.query.all()
     return render_template('form_funcionario.html', setores=setores)
 
+@app.route('/funcionarios/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_funcionario(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('listar_funcionarios'))
+    
+    func = Funcionario.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        func.nome = request.form.get('nome').upper()
+        func.siape = request.form.get('siape')
+        func.lotacao = request.form.get('lotacao')
+        func.setor_id = int(request.form.get('setor_id'))
+        func.jornada = request.form.get('jornada')
+        func.escala = request.form.get('escala')
+        func.trabalho_remoto_integral = request.form.get('remoto_integral')
+        
+        db.session.commit()
+        flash(f'Dados de {func.nome} atualizados!')
+        return redirect(url_for('listar_funcionarios'))
+
+    setores = Setor.query.all()
+    return render_template('form_funcionario.html', setores=setores, funcionario=func)
+
+@app.route('/funcionarios/excluir/<int:id>')
+@login_required
+def excluir_funcionario(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('listar_funcionarios'))
+    
+    func = Funcionario.query.get_or_404(id)
+    nome = func.nome
+    
+    # Remove as frequências vinculadas antes de excluir o funcionário
+    Frequencia.query.filter_by(funcionario_id=id).delete()
+    
+    db.session.delete(func)
+    db.session.commit()
+    
+    flash(f'Funcionário {nome} removido do sistema.')
+    return redirect(url_for('listar_funcionarios'))
+
 @app.route('/relatorio', methods=['GET'])
 @login_required
 def relatorio_geral():
@@ -250,20 +310,20 @@ def relatorio_geral():
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
 
-    # Valores padrão para filtros (agora via GET)
+    # Valores padrão para filtros
     mes_filtro = request.args.get('mes', 'JANEIRO')
     ano_filtro = request.args.get('ano', 2026, type=int)
     setor_id = request.args.get('setor_id', type=int)
     nome_busca = request.args.get('nome', '').strip()
     freq_integral_filtro = request.args.get('freq_integral', '')
 
-    # Query Base (Filtro de tempo é obrigatório)
+    # Query Base
     query = Frequencia.query\
         .join(Funcionario)\
         .join(Setor)\
         .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
     
-    # Filtros Adicionais (Opcionais)
+    # Filtros Adicionais
     if setor_id:
         query = query.filter(Funcionario.setor_id == setor_id)
     
@@ -294,57 +354,13 @@ def relatorio_geral():
                            setores=setores,
                            filtros=filtros_atuais)
 
-@app.route('/funcionarios/editar/<int:id>', methods=['GET', 'POST'])
-@login_required
-def editar_funcionario(id):
-    if current_user.perfil != 'gestor':
-        flash('Acesso negado.')
-        return redirect(url_for('listar_funcionarios'))
-    
-    func = Funcionario.query.get_or_404(id)
-
-    if request.method == 'POST':
-        func.nome = request.form.get('nome').upper()
-        func.siape = request.form.get('siape')
-        func.lotacao = request.form.get('lotacao')
-        func.setor_id = int(request.form.get('setor_id'))
-        func.jornada = request.form.get('jornada')
-        func.escala = request.form.get('escala')
-        func.trabalho_remoto_integral = request.form.get('remoto_integral')
-
-        db.session.commit()
-        flash(f'Dados de {func.nome} atualizados!')
-        return redirect(url_for('listar_funcionarios'))
-    
-    setores = Setor.query.all()
-    return render_template('form_funcionario.html', setores=setores, funcionario=func)
-
-@app.route('/funcionarios/excluir/<int:id>')
-@login_required
-def excluir_funcionario(id):
-    if current_user.perfil != 'gestor':
-        flash('Acesso negado.')
-        return redirect(url_for('listar_funcionarios'))
-    
-    func = Funcionario.query.get_or_404(id)
-    nome = func.nome
-
-    # remove as frequencias antes de excluir para evitar erro no bd
-    Frequencia.query.filter_by(funcionario_id=id).delete()
-
-    db.session.delete(func)
-    db.session.commit()
-
-    flash(f'Funcionário {nome} removido do sistema.')
-    return redirect(url_for('listar_funcionarios'))
-
 @app.route('/relatorio/exportar')
 @login_required
 def exportar_relatorio():
     if current_user.perfil != 'gestor':
         return redirect(url_for('dashboard'))
 
-    # Recupera os mesmos filtros da URL (request.args)
+    # Recupera os mesmos filtros da URL
     mes_filtro = request.args.get('mes')
     ano_filtro = request.args.get('ano', type=int)
     setor_id = request.args.get('setor_id', type=int)
@@ -370,7 +386,7 @@ def exportar_relatorio():
 
     # Criação do CSV em memória
     si = io.StringIO()
-    cw = csv.writer(si, delimiter=';') 
+    cw = csv.writer(si, delimiter=';') # Ponto e vírgula é melhor para Excel BR
     
     # Cabeçalho
     cw.writerow(['SETOR', 'SIGLA', 'LOTAÇÃO', 'SERVIDOR', 'SIAPE', 'REMOTO (REV)', 'FREQ. INTEGRAL', 'OBSERVAÇÕES'])
@@ -393,6 +409,23 @@ def exportar_relatorio():
     output.headers["Content-type"] = "text/csv"
     return output
 
+@app.route('/setores/excluir/<int:id>')
+@login_required
+def excluir_setor(id):
+    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
+    
+    setor = Setor.query.get_or_404(id)
+    
+    # Verifica se tem funcionários
+    if setor.funcionarios:
+        flash('Erro: Não é possível excluir um setor que possui funcionários vinculados.')
+    else:
+        db.session.delete(setor)
+        db.session.commit()
+        flash(f'Setor {setor.nome} excluído.')
+        
+    return redirect(url_for('listar_setores'))
+
 @app.route('/setores')
 @login_required
 def listar_setores():
@@ -400,15 +433,15 @@ def listar_setores():
     lista = Setor.query.all()
     return render_template('lista_setores.html', setores=lista)
 
-@app.route('/setores/novo', methods={'GET', 'POST'})
+@app.route('/setores/novo', methods=['GET', 'POST'])
 @login_required
 def novo_setor():
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-
+    
     if request.method == 'POST':
         novo = Setor(
             nome=request.form.get('nome'),
-            sigla=request.form.get('sigla'),   
+            sigla=request.form.get('sigla'),
             chefia_nome=request.form.get('chefia_nome'),
             chefia_matricula=request.form.get('chefia_matricula')
         )
@@ -434,27 +467,10 @@ def novo_usuario():
         db.session.add(novo_user)
         db.session.commit()
         flash('Usuário criado com sucesso!')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('listar_usuarios'))
         
     setores = Setor.query.all()
     return render_template('form_usuario.html', setores=setores)
-
-@app.route('/setores/excluir/<int:id>')
-@login_required
-def excluir_setor(id):
-    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-    
-    setor = Setor.query.get_or_404(id)
-    
-    # Verifica se tem funcionários
-    if setor.funcionarios:
-        flash('Erro: Não é possível excluir um setor que possui funcionários vinculados.')
-    else:
-        db.session.delete(setor)
-        db.session.commit()
-        flash(f'Setor {setor.nome} excluído.')
-        
-    return redirect(url_for('listar_setores'))
 
 @app.route('/usuarios')
 @login_required
@@ -527,6 +543,131 @@ def minha_senha():
             return redirect(url_for('dashboard'))
             
     return render_template('minha_senha.html')
+
+@app.route('/google/login')
+@login_required
+def google_login():
+    if not os.path.exists(CLIENT_SECRETS_FILE):
+        flash("Arquivo 'client_secret.json' não encontrado na raiz do projeto. Verifique o guia 'google-planilhas.md'.")
+        return redirect(url_for('relatorio_geral'))
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE, scopes=SCOPES)
+    flow.redirect_uri = url_for('google_callback', _external=True)
+    
+    authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true')
+    session['state'] = state
+    session['google_filters'] = request.args.to_dict()
+    
+    return redirect(authorization_url)
+
+@app.route('/google/callback')
+def google_callback():
+    state = session.get('state')
+    if not state:
+        return redirect(url_for('relatorio_geral'))
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
+    flow.redirect_uri = url_for('google_callback', _external=True)
+
+    authorization_response = request.url
+    flow.fetch_token(authorization_response=authorization_response)
+
+    credentials = flow.credentials
+    session['google_credentials'] = {
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'token_uri': credentials.token_uri,
+        'client_id': credentials.client_id,
+        'client_secret': credentials.client_secret,
+        'scopes': credentials.scopes
+    }
+
+    filtros = session.get('google_filters', {})
+    return redirect(url_for('exportar_google_sheets', **filtros))
+
+@app.route('/relatorio/google-sheets')
+@login_required
+def exportar_google_sheets():
+    if 'google_credentials' not in session:
+        return redirect(url_for('google_login', **request.args))
+
+    # 1. Recuperar dados filtrados
+    mes_filtro = request.args.get('mes')
+    ano_filtro = request.args.get('ano', type=int)
+    setor_id = request.args.get('setor_id', type=int)
+    nome_busca = request.args.get('nome', '').strip()
+    freq_integral_filtro = request.args.get('freq_integral', '')
+
+    query = Frequencia.query.join(Funcionario).join(Setor).filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
+    if setor_id: query = query.filter(Funcionario.setor_id == setor_id)
+    if nome_busca: query = query.filter((Funcionario.nome.contains(nome_busca.upper())) | (Funcionario.siape.contains(nome_busca)))
+    if freq_integral_filtro: query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
+
+    resultados = query.all()
+
+    if not resultados:
+        flash("Nenhum registro encontrado para exportar.")
+        return redirect(url_for('relatorio_geral', **request.args))
+
+    # 2. Manipular Excel com Modelo Local
+    caminho_modelo = os.path.join(app.static_folder, 'modelo_frequencia.xlsx')
+    if not os.path.exists(caminho_modelo):
+        flash(f"Modelo Excel não encontrado em {caminho_modelo}")
+        return redirect(url_for('relatorio_geral', **request.args))
+
+    wb = openpyxl.load_workbook(caminho_modelo)
+    ws = wb.active
+
+    # Se houver mais de 188 registros (5 a 192), insere linhas extras mantendo as instruções
+    num_registros = len(resultados)
+    limite_padrao = 188
+    if num_registros > limite_padrao:
+        linhas_extras = num_registros - limite_padrao
+        ws.insert_rows(193, linhas_extras) # Insere a partir da 193 (antes das instruções)
+
+    # Preencher dados a partir da linha 5
+    for i, freq in enumerate(resultados):
+        row = 5 + i
+        ws.cell(row=row, column=1).value = freq.funcionario.setor.nome
+        ws.cell(row=row, column=2).value = freq.funcionario.setor.sigla
+        ws.cell(row=row, column=3).value = freq.funcionario.lotacao
+        ws.cell(row=row, column=4).value = freq.funcionario.nome
+        ws.cell(row=row, column=5).value = freq.funcionario.siape
+        ws.cell(row=row, column=6).value = freq.funcionario.dias_remoto_revezamento
+        ws.cell(row=row, column=7).value = freq.frequencia_integral
+        ws.cell(row=row, column=8).value = freq.observacoes
+
+    # Salva em arquivo temporário
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+        temp_path = tmp.name
+        wb.save(temp_path)
+
+    # 3. Upload e Conversão para Google Sheets
+    try:
+        creds = google.oauth2.credentials.Credentials(**session['google_credentials'])
+        # Build Drive service to upload file
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        file_metadata = {
+            'name': f'Relatório Frequência {mes_filtro}-{ano_filtro}',
+            'mimeType': 'application/vnd.google-apps.spreadsheet' # Conversão automática
+        }
+        media = MediaFileUpload(temp_path, 
+                                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                resumable=True)
+        
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        
+        flash(f'Sucesso! Planilha criada no seu Google Drive (ID: {file.get("id")})')
+    except Exception as e:
+        flash(f'Erro ao salvar no Google Drive: {str(e)}')
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return redirect(url_for('relatorio_geral', **request.args))
 
 if __name__ == '__main__':
     with app.app_context():

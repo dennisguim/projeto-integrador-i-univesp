@@ -43,4 +43,16 @@
 
     <br>
     <a href="{{ url_for('listar_funcionarios') }}">Voltar</a>
-{% endblock %}
+
+    <div style="margin-top: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+        <h3 style="margin-top: 0; color: #333;">Orientações para preenchimento:</h3>
+        <ul style="line-height: 1.6; color: #555;">
+            <li>No campo <strong>"ESCALA"</strong>, informar como o servidor cumpre sua jornada de trabalho. Ex: Diaristas, escala 12x36, etc.</li>
+            <li>Nos campos <strong>"TRABALHO REMOTO INTEGRAL"</strong> e <strong>"FREQUÊNCIA INTEGRAL"</strong> devem ser selecionadas as opções SIM ou NÃO.</li>
+            <li>Caso o campo <strong>"TRABALHO REMOTO INTEGRAL"</strong> tenha a opção <strong>NÃO</strong> selecionada, informar os dias em que houve trabalho remoto no campo <strong>"DIAS DE TRABALHO REMOTO EM REVEZAMENTO"</strong>.</li>
+            <li>Caso o campo <strong>"FREQUÊNCIA INTEGRAL"</strong> tenha a opção <strong>NÃO</strong> selecionada, informar os dias de falta no campo <strong>"OBSERVAÇÕES"</strong>.</li>
+            <li>As saídas antecipadas/atrasos (que gerem desconto), devem ser informadas no campo <strong>"OBSERVAÇÕES"</strong>, com os dias em que ocorreram.</li>
+            <li>Caso algum servidor não esteja na planilha ou esteja incorretamente nela, solicitamos que nos informem em despacho no mesmo processo para acerto.</li>
+        </ul>
+    </div>
+    {% endblock %}
