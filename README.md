@@ -88,4 +88,4 @@ O projeto aplica conhecimentos práticos de:
 
 ## Licença
 
-Este projeto é de caráter acadêmico e destinado ao uso interno na Divisão de Enfermagem do INCA HCIII.
+Este projeto é de caráter acadêmico e destinado ao uso interno do INCA HCIII.
