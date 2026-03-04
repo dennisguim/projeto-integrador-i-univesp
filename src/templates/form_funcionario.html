@@ -3,7 +3,10 @@
 {% block title %}{{ 'Editar' if funcionario else 'Novo' }} Funcionário{% endblock %}
 
 {% block content %}
-    <h2>{{ 'Editar Dados de ' + funcionario.nome if funcionario else 'Novo Funcionário' }}</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>{{ 'Editar Dados de ' + funcionario.nome if funcionario else 'Novo Funcionário' }}</h2>
+        <a href="{{ url_for('listar_funcionarios') }}"><button type="button">Voltar</button></a>
+    </div>
 
     <form method="post">
         <label>Nome Completo:</label>
@@ -13,7 +16,7 @@
         <input type="text" name="siape" value="{{ funcionario.siape if funcionario }}" required>
 
         <label>Lotação:</label>
-        <input type="text" name="lotacao" placeholder="Ex: HCIII">
+        <input type="text" name="lotacao" value="{{ funcionario.lotacao if funcionario }}" placeholder="Ex: HCIII">
 
         <label>Setor:</label>
         <select name="setor_id" required>

@@ -3,12 +3,15 @@
 {% block title %}Alterar Senha de Usuário{% endblock %}
 
 {% block content %}
-    <h2>Alterar Senha de {{ usuario.nome_usuario }}</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Alterar Senha de {{ usuario.nome_usuario }}</h2>
+        <a href="{{ url_for('listar_usuarios') }}"><button type="button">Voltar</button></a>
+    </div>
 
     <form method="post">
         <label>Nova Senha:</label>
         <input type="password" name="nova_senha" required>
-
+        
         <button type="submit">Salvar Nova Senha</button>
     </form>
 

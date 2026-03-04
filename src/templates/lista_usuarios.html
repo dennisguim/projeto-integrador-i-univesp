@@ -25,19 +25,20 @@
             {% for u in usuarios %}
             <tr>
                 <td>{{ u.id }}</td>
-                <td>{{ u.nome_usuaroi }}</td>
+                <td>{{ u.nome_usuario }}</td>
                 <td>{{ u.perfil }}</td>
                 <td>
                     {% if u.setor_vinculado %}
-                        {{ u.setor_vinculado.nome}} ({{ u.setor_vinculado.sigla }})
+                        {{ u.setor_vinculado.nome }} ({{ u.setor_vinculado.sigla }})
                     {% else %}
                         -
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{{ url_for('admin_alterar_senha', id=u.id) }}">Alterar Senha</a>
+                    <a href="{{ url_for('admin_alterar_senha', id=u.id) }}">Alterar Senha</a> |
                     {% if u.id != current_user.id %}
-                        <a href="{{ url_for('excluir_usuario', id=u.id) }}" onclick="return confirm ('Tem certeza que deseja excluir este usuário? A ação não pode ser desfeita.')">Excluir</a>
+                        <a href="{{ url_for('excluir_usuario', id=u.id) }}" 
+                           onclick="return confirm('Tem certeza que deseja excluir este usuário? A ação não pode ser desfeita.')">Excluir</a>
                     {% else %}
                         <span style="color: grey;">Excluir</span>
                     {% endif %}
@@ -47,5 +48,6 @@
         </tbody>
     </table>
 
-    <br><a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
+    <br>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
 {% endblock %}

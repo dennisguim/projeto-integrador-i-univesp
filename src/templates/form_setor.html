@@ -3,11 +3,14 @@
 {% block title %}Novo Setor{% endblock %}
 
 {% block content %}
-    <h2>Cadastrar Novo Setor</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Cadastrar Novo Setor</h2>
+        <a href="{{ url_for('listar_setores') }}"><button type="button">Voltar</button></a>
+    </div>
 
     <form method="post">
         <label>Nome do Setor:</label>
-        <input type="text" name="nome" required placeholder="EX: Divisão de Enfermagem">
+        <input type="text" name="nome" required placeholder="Ex: Divisão de Enfermagem">
 
         <label>Sigla:</label>
         <input type="text" name="sigla" placeholder="Ex: DIENF">

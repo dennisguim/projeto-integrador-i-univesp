@@ -7,13 +7,12 @@
         <h2>Registrar Frequência: {{ funcionario.nome }}</h2>
         <a href="{{ url_for('listar_funcionarios') }}"><button type="button">Voltar</button></a>
     </div>
-    
     <p>Setor: {{ funcionario.setor.nome }} | SIAPE: {{ funcionario.siape }}</p>
 
-    <form method="post">
+    <form method="post" aria-label="Formulário de registro de frequência">
         <div>
-            <label>Mês de Referência:</label><br>
-            <select name="mes" required>
+            <label for="mes">Mês de Referência:</label><br>
+            <select name="mes" id="mes" required aria-required="true">
                 {% for m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
                     <option value="{{ m }}" {% if mes_padrao == m %}selected{% endif %}>{{ m }}</option>
                 {% endfor %}
@@ -21,13 +20,13 @@
         </div>
         <br>
         <div>
-            <label>Ano:</label><br>
-            <input type="number" name="ano" value="{{ ano_padrao if ano_padrao else 2026 }}" required>
+            <label for="ano">Ano:</label><br>
+            <input type="number" name="ano" id="ano" value="{{ ano_padrao if ano_padrao else 2026 }}" required aria-required="true">
         </div>
         <br>
         <div>
-            <label>Frequência Integral?</label><br>
-            <select name="frequencia_integral">
+            <label for="frequencia_integral">Frequência Integral?</label><br>
+            <select name="frequencia_integral" id="frequencia_integral">
                 <option value="SIM">SIM</option>
                 <option value="NÃO">NÃO</option>
                 <option value="PARCIAL">PARCIAL</option>
@@ -35,8 +34,8 @@
         </div>
         <br>
         <div>
-            <label>Observações / Ocorrências</label><br>
-            <textarea name="observacoes" rows="4" cols="50" placeholder="Licença médica dia 10. Faltas injustificadas nos dias 12 e 13."></textarea>
+            <label for="observacoes">Observações / Ocorrências</label><br>
+            <textarea name="observacoes" id="observacoes" rows="4" cols="50" placeholder="Licença médica dia 10. Faltas injustificadas nos dias 12 e 13."></textarea>
         </div>
         <br>
         <button type="submit">Salvar Registro</button>

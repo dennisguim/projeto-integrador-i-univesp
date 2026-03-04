@@ -5,40 +5,40 @@
 {% block content %}
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h2>Gerenciar Frequência</h2>
-        <a href="{{ url_for('dashboard') }}"><button type="button">Voltar ao Painel</button></a>
+        <a href="{{ url_for('dashboard') }}" aria-label="Voltar ao Painel Principal"><button type="button">Voltar ao Painel</button></a>
     </div>
 
     {% if current_user.perfil == 'gestor' %}
         <div style="margin-bottom: 20px;">
-            <a href="{{ url_for('novo_funcionario') }}"><button>+ Novo Funcionário</button></a>
+            <a href="{{ url_for('novo_funcionario') }}"><button aria-label="Cadastrar novo funcionário">+ Novo Funcionário</button></a>
         </div>
     {% endif %}
 
     <!-- Seletor de Mês/Ano -->
-    <form method="get" style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-        <span style="font-weight: bold; color: #0d47a1;">Período de Referência:</span>
+    <form method="get" class="filter-form" role="search" aria-label="Filtrar por período">
+        <label for="mes-ref" style="font-weight: bold; color: #0d47a1;">Período de Referência:</label>
         
-        <select name="mes" onchange="this.form.submit()" style="padding: 5px;">
+        <select name="mes" id="mes-ref" onchange="this.form.submit()" aria-label="Selecionar mês">
             {% for m in ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'] %}
                 <option value="{{ m }}" {% if m == mes_ref %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
         </select>
         
-        <input type="number" name="ano" value="{{ ano_ref }}" style="width: 70px; padding: 5px;">
-        <button type="submit" style="background-color: #0d47a1; color: white; border: none; padding: 6px 12px; border-radius: 4px;">Atualizar</button>
+        <input type="number" name="ano" id="ano-ref" value="{{ ano_ref }}" style="width: 80px;" aria-label="Digitar ano">
+        <button type="submit">Atualizar</button>
     </form>
 
     <!-- Lista de Pendentes -->
     <h3 style="color: #d32f2f;">🔻 Pendentes ({{ pendentes|length }})</h3>
     {% if pendentes %}
-        <table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+        <table aria-label="Lista de funcionários com frequência pendente">
             <thead>
-                <tr style="background-color: #ffebee;">
-                    <th>Nome</th>
-                    <th>SIAPE</th>
-                    <th>Setor</th>
-                    <th>Jornada</th>
-                    <th>Ações</th>
+                <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">SIAPE</th>
+                    <th scope="col">Setor</th>
+                    <th scope="col">Jornada</th>
+                    <th scope="col">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,14 +47,14 @@
                     <td>{{ func.nome }}</td>
                     <td>{{ func.siape }}</td>
                     <td>{{ func.setor.nome }} ({{ func.setor.sigla }})</td>
-                    <td>{{ func.jornada }}</td>
+                    <td>{{ func.jornada }}h</td>
                     <td>
                         <a href="{{ url_for('registrar_frequencia', func_id=func.id) }}?mes={{ mes_ref }}&ano={{ ano_ref }}">
-                            <button style="background-color: #d32f2f; color: white; border: none; padding: 5px 10px; cursor: pointer;">Lançar Frequência</button>
+                            <button class="btn-danger" aria-label="Lançar frequência para {{ func.nome }}">Lançar Frequência</button>
                         </a>
                         {% if current_user.perfil == 'gestor' %}
-                            | <a href="{{ url_for('editar_funcionario', id=func.id) }}">Editar</a> 
-                            | <a href="{{ url_for('excluir_funcionario', id=func.id) }}" onclick="return confirm('Excluir funcionário?')">Excluir</a>
+                            | <a href="{{ url_for('editar_funcionario', id=func.id) }}" aria-label="Editar {{ func.nome }}">Editar</a> 
+                            | <a href="{{ url_for('excluir_funcionario', id=func.id) }}" onclick="return confirm('Excluir funcionário?')" aria-label="Excluir {{ func.nome }}">Excluir</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -70,14 +70,14 @@
     <!-- Lista de Concluídos -->
     <h3 style="color: #388e3c;">✅ Frequência Lançada ({{ concluidos|length }})</h3>
     {% if concluidos %}
-        <table border="1" style="width: 100%; border-collapse: collapse;">
+        <table aria-label="Lista de funcionários com frequência já lançada">
             <thead>
-                <tr style="background-color: #e8f5e9;">
-                    <th>Nome</th>
-                    <th>Setor</th>
-                    <th>Freq. Integral</th>
-                    <th>Observações</th>
-                    <th>Ações</th>
+                <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Setor</th>
+                    <th scope="col">Freq. Integral</th>
+                    <th scope="col">Observações</th>
+                    <th scope="col">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -87,16 +87,16 @@
                     <td>{{ func.setor.sigla }}</td>
                     <td style="text-align: center;">
                         {% if func.freq_registrada.frequencia_integral == 'SIM' %}
-                            <span style="color: green; font-weight: bold;">SIM</span>
+                            <span style="color: green; font-weight: bold;" aria-label="Frequência Integral: SIM">SIM</span>
                         {% else %}
-                            <span style="color: red; font-weight: bold;">{{ func.freq_registrada.frequencia_integral }}</span>
+                            <span style="color: red; font-weight: bold;" aria-label="Frequência Integral: {{ func.freq_registrada.frequencia_integral }}">{{ func.freq_registrada.frequencia_integral }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ func.freq_registrada.observacoes }}</td>
+                    <td>{{ func.freq_registrada.observacoes or 'Nenhuma' }}</td>
                     <td>
                         <span style="color: green;">Lançado ✔</span>
                         {% if current_user.perfil == 'gestor' %}
-                             | <a href="{{ url_for('editar_funcionario', id=func.id) }}">Editar Func.</a>
+                             | <a href="{{ url_for('editar_funcionario', id=func.id) }}" aria-label="Editar dados de {{ func.nome }}">Editar Func.</a>
                         {% endif %}
                     </td>
                 </tr>
@@ -110,3 +110,4 @@
     <br>
     <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
 {% endblock %}
+

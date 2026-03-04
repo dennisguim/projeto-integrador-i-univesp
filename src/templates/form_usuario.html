@@ -1,27 +1,37 @@
 {% extends "base.html" %}
+
+{% block title %}Novo Usuário{% endblock %}
+
 {% block content %}
-<h2>Novo Usuário</h2>
-<form method="post">
-    <label>Usuário (Login):</label>
-    <input type="text" name="username" required>
-    
-    <label>Senha:</label>
-    <input type="password" name="password" required>
-    
-    <label>Perfil:</label>
-    <select name="perfil" required>
-        <option value="chefe">Chefe de Setor</option>
-        <option value="gestor">Gestor (Admin)</option>
-    </select>
-    
-    <label>Vincular a Setor (Apenas para Chefes):</label>
-    <select name="setor_id">
-        <option value="">-- Nenhum --</option>
-        {% for s in setores %}
-            <option value="{{ s.id }}">{{ s.nome }}</option>
-        {% endfor %}
-    </select>
-    
-    <button type="submit">Criar Usuário</button>
-</form>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Cadastrar Novo Usuário</h2>
+        <a href="{{ url_for('listar_usuarios') }}"><button type="button">Voltar</button></a>
+    </div>
+
+    <form method="post">
+        <label>Nome de Usuário (Login):</label>
+        <input type="text" name="username" required>
+        
+        <label>Senha:</label>
+        <input type="password" name="password" required>
+        
+        <label>Perfil de Acesso:</label>
+        <select name="perfil" required>
+            <option value="chefe">Chefe de Setor</option>
+            <option value="gestor">Gestor (Administrador)</option>
+        </select>
+        
+        <label>Vincular a Setor (Apenas para Chefes):</label>
+        <select name="setor_id">
+            <option value="">-- Nenhum --</option>
+            {% for s in setores %}
+                <option value="{{ s.id }}">{{ s.nome }} ({{ s.sigla }})</option>
+            {% endfor %}
+        </select>
+        
+        <button type="submit">Criar Usuário</button>
+    </form>
+
+    <br>
+    <a href="{{ url_for('listar_usuarios') }}">Voltar para Lista</a>
 {% endblock %}
