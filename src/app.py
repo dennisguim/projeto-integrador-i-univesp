@@ -3,6 +3,7 @@ import io
 import csv
 import tempfile
 import openpyxl
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, make_response, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -95,6 +96,19 @@ class Frequencia(db.Model):
 
     funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
 
+class Log(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario = db.Column(db.String(100))
+    acao = db.Column(db.String(200))
+    detalhes = db.Column(db.Text)
+
+def registrar_log(acao, detalhes=""):
+    usuario_nome = current_user.nome_usuario if current_user.is_authenticated else "Anônimo"
+    novo_log = Log(usuario=usuario_nome, acao=acao, detalhes=detalhes)
+    db.session.add(novo_log)
+    db.session.commit()
+
 # ---- ROTAS (PÁGINAS) ----
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -110,8 +124,10 @@ def login():
         # Verificação de senha (posteriormente usar hash)
         if user and user.senha == password:
             login_user(user)
+            registrar_log("Login", f"Usuário {username} logou no sistema.")
             return redirect(url_for('dashboard'))
         else:
+            registrar_log("Login Falhou", f"Tentativa falha de login para o usuário {username}.")
             flash('Usuário ou senha inválidos.')
     
     return render_template('login.html')
@@ -125,7 +141,9 @@ def dashboard():
 @app.route('/logout')
 @login_required
 def logout():
+    username = current_user.nome_usuario
     logout_user()
+    registrar_log("Logout", f"Usuário {username} saiu do sistema.")
     return redirect(url_for('login'))
 
 @app.route('/funcionarios', methods=['GET'])
@@ -197,6 +215,7 @@ def registrar_frequencia(func_id):
              # Atualiza em vez de criar novo (ou avisa erro, dependendo da regra. Aqui vou atualizar)
              existente.frequencia_integral = freq_int
              existente.observacoes = obs
+             registrar_log("Atualizar Frequência", f"Frequência de {funcionario.nome} ({mes}/{ano}) atualizada.")
              flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) atualizada!')
         else:
             # cria registro de frequencia
@@ -208,6 +227,7 @@ def registrar_frequencia(func_id):
                 funcionario_id=funcionario.id
             )
             db.session.add(nova_freq)
+            registrar_log("Lançar Frequência", f"Frequência de {funcionario.nome} ({mes}/{ano}) registrada.")
             flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) registrada!')
             
         db.session.commit()
@@ -250,6 +270,7 @@ def novo_funcionario():
         )
         db.session.add(novo)
         db.session.commit()
+        registrar_log("Cadastrar Funcionário", f"Funcionário {nome} (SIAPE {siape}) cadastrado.")
 
         flash(f'Funcionário {nome} cadastrado com sucesso!')
         return redirect(url_for('listar_funcionarios'))
@@ -277,6 +298,7 @@ def editar_funcionario(id):
         func.trabalho_remoto_integral = request.form.get('remoto_integral')
         
         db.session.commit()
+        registrar_log("Editar Funcionário", f"Dados do funcionário {func.nome} (SIAPE {func.siape}) atualizados.")
         flash(f'Dados de {func.nome} atualizados!')
         return redirect(url_for('listar_funcionarios'))
 
@@ -292,12 +314,14 @@ def excluir_funcionario(id):
     
     func = Funcionario.query.get_or_404(id)
     nome = func.nome
+    siape = func.siape
     
     # Remove as frequências vinculadas antes de excluir o funcionário
     Frequencia.query.filter_by(funcionario_id=id).delete()
     
     db.session.delete(func)
     db.session.commit()
+    registrar_log("Excluir Funcionário", f"Funcionário {nome} (SIAPE {siape}) removido.")
     
     flash(f'Funcionário {nome} removido do sistema.')
     return redirect(url_for('listar_funcionarios'))
@@ -416,6 +440,7 @@ def excluir_setor(id):
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
     
     setor = Setor.query.get_or_404(id)
+    nome = setor.nome
     
     # Verifica se tem funcionários
     if setor.funcionarios:
@@ -423,6 +448,7 @@ def excluir_setor(id):
     else:
         db.session.delete(setor)
         db.session.commit()
+        registrar_log("Excluir Setor", f"Setor {nome} removido.")
         flash(f'Setor {setor.nome} excluído.')
         
     return redirect(url_for('listar_setores'))
@@ -448,10 +474,31 @@ def novo_setor():
         )
         db.session.add(novo)
         db.session.commit()
+        registrar_log("Cadastrar Setor", f"Setor {novo.nome} ({novo.sigla}) cadastrado.")
         flash('Setor criado!')
         return redirect(url_for('listar_setores'))
     
     return render_template('form_setor.html')
+
+@app.route('/setores/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_setor(id):
+    if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
+    
+    setor = Setor.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        setor.nome = request.form.get('nome')
+        setor.sigla = request.form.get('sigla')
+        setor.chefia_nome = request.form.get('chefia_nome')
+        setor.chefia_matricula = request.form.get('chefia_matricula')
+        
+        db.session.commit()
+        registrar_log("Editar Setor", f"Setor {setor.nome} ({setor.sigla}) atualizado.")
+        flash(f'Setor {setor.nome} atualizado!')
+        return redirect(url_for('listar_setores'))
+    
+    return render_template('form_setor.html', setor=setor)
 
 @app.route('/usuarios/novo', methods=['GET', 'POST'])
 @login_required
@@ -459,14 +506,16 @@ def novo_usuario():
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
+        username = request.form.get('username')
         novo_user = Usuario(
-            nome_usuario=request.form.get('username'),
+            nome_usuario=username,
             senha=request.form.get('password'),
             perfil=request.form.get('perfil'),
             setor_id=request.form.get('setor_id') if request.form.get('setor_id') else None
         )
         db.session.add(novo_user)
         db.session.commit()
+        registrar_log("Cadastrar Usuário", f"Usuário {username} criado.")
         flash('Usuário criado com sucesso!')
         return redirect(url_for('listar_usuarios'))
         
@@ -498,6 +547,7 @@ def excluir_usuario(id):
     nome = user.nome_usuario
     db.session.delete(user)
     db.session.commit()
+    registrar_log("Excluir Usuário", f"Usuário {nome} removido.")
     
     flash(f'Usuário {nome} excluído com sucesso.')
     return redirect(url_for('listar_usuarios'))
@@ -516,6 +566,7 @@ def admin_alterar_senha(id):
         if nova_senha:
             user.senha = nova_senha # Em produção usar hash
             db.session.commit()
+            registrar_log("Alterar Senha (Admin)", f"Senha do usuário {user.nome_usuario} alterada pelo administrador.")
             flash(f'Senha de {user.nome_usuario} alterada com sucesso!')
             return redirect(url_for('listar_usuarios'))
         else:
@@ -540,10 +591,66 @@ def minha_senha():
         else:
             current_user.senha = nova_senha
             db.session.commit()
+            registrar_log("Alterar Senha", "O próprio usuário alterou sua senha.")
             flash('Sua senha foi alterada com sucesso!')
             return redirect(url_for('dashboard'))
             
     return render_template('minha_senha.html')
+
+@app.route('/status_frequencia')
+@login_required
+def status_frequencia():
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+    
+    mes_ref = request.args.get('mes', 'JANEIRO')
+    ano_ref = request.args.get('ano', 2026, type=int)
+    
+    setores = Setor.query.order_by(Setor.nome).all()
+    status_setores = []
+    
+    for s in setores:
+        total_funcionarios = len(s.funcionarios)
+        if total_funcionarios == 0:
+            status_setores.append({
+                'setor': s,
+                'total': 0,
+                'lancados': 0,
+                'pendentes': 0,
+                'concluido': True
+            })
+            continue
+            
+        # Conta quantos funcionários deste setor têm frequência no mês/ano
+        lancados = Frequencia.query.join(Funcionario).filter(
+            Funcionario.setor_id == s.id,
+            Frequencia.mes == mes_ref,
+            Frequencia.ano == ano_ref
+        ).count()
+        
+        status_setores.append({
+            'setor': s,
+            'total': total_funcionarios,
+            'lancados': lancados,
+            'pendentes': total_funcionarios - lancados,
+            'concluido': (lancados >= total_funcionarios)
+        })
+        
+    return render_template('status_frequencia.html', 
+                           status=status_setores, 
+                           mes_ref=mes_ref, 
+                           ano_ref=ano_ref)
+
+@app.route('/logs')
+@login_required
+def listar_logs():
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+    
+    logs = Log.query.order_by(Log.data_hora.desc()).limit(500).all()
+    return render_template('lista_logs.html', logs=logs)
 
 @app.route('/google/login')
 @login_required

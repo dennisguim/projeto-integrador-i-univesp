@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Status dos Lançamentos{% endblock %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Status de Lançamentos de Frequência</h2>
+        <a href="{{ url_for('dashboard') }}"><button type="button">Voltar ao Painel</button></a>
+    </div>
+
+    <!-- Filtro de Mês/Ano -->
+    <form method="get" class="filtros" style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+        <label>Mês:</label>
+        <select name="mes">
+            {% for m in ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"] %}
+                <option value="{{ m }}" {% if m == mes_ref %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Ano:</label>
+        <input type="number" name="ano" value="{{ ano_ref }}" style="width: 80px;">
+
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <div style="margin-bottom: 20px;">
+        <p><strong>Referência:</strong> {{ mes_ref }} / {{ ano_ref }}</p>
+    </div>
+
+    <table border="1" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th>Setor (Sigla)</th>
+                <th>Total Servidores</th>
+                <th>Lançados</th>
+                <th>Pendentes</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in status %}
+            <tr>
+                <td>{{ item.setor.nome }} ({{ item.setor.sigla }})</td>
+                <td align="center">{{ item.total }}</td>
+                <td align="center">{{ item.lancados }}</td>
+                <td align="center" style="color: {{ 'red' if item.pendentes > 0 else 'black' }};">
+                    {{ item.pendentes }}
+                </td>
+                <td align="center">
+                    {% if item.concluido %}
+                        <span style="color: green; font-weight: bold;">✔ FINALIZADO</span>
+                    {% else %}
+                        <span style="color: orange; font-weight: bold;">⚠ PENDENTE</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
+{% endblock %}

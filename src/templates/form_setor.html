@@ -1,27 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %}Novo Setor{% endblock %}
+{% block title %}{% if setor %}Editar Setor{% else %}Novo Setor{% endif %}{% endblock %}
 
 {% block content %}
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h2>Cadastrar Novo Setor</h2>
+        <h2>{% if setor %}Editar Setor: {{ setor.nome }}{% else %}Cadastrar Novo Setor{% endif %}</h2>
         <a href="{{ url_for('listar_setores') }}"><button type="button">Voltar</button></a>
     </div>
 
     <form method="post">
         <label>Nome do Setor:</label>
-        <input type="text" name="nome" required placeholder="Ex: Divisão de Enfermagem">
+        <input type="text" name="nome" required value="{{ setor.nome if setor else '' }}" placeholder="Ex: Divisão de Enfermagem">
 
         <label>Sigla:</label>
-        <input type="text" name="sigla" placeholder="Ex: DIENF">
+        <input type="text" name="sigla" value="{{ setor.sigla if setor else '' }}" placeholder="Ex: DIENF">
 
         <label>Nome da Chefia:</label>
-        <input type="text" name="chefia_nome" required>
+        <input type="text" name="chefia_nome" required value="{{ setor.chefia_nome if setor else '' }}">
 
         <label>Matrícula da Chefia:</label>
-        <input type="text" name="chefia_matricula">
+        <input type="text" name="chefia_matricula" value="{{ setor.chefia_matricula if setor else '' }}">
 
-        <button type="submit">Salvar Setor</button>
+        <button type="submit">{% if setor %}Atualizar Setor{% else %}Salvar Setor{% endif %}</button>
     </form>
 
     <br>

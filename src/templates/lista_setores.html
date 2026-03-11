@@ -27,6 +27,7 @@
                 <td>{{ setor.sigla }}</td>
                 <td>{{ setor.chefia_nome }} ({{ setor.chefia_matricula }})</td>
                 <td>
+                    <a href="{{ url_for('editar_setor', id=setor.id) }}">Editar</a> |
                     <a href="{{ url_for('excluir_setor', id=setor.id) }}" 
                        onclick="return confirm('Tem certeza? Só é possível excluir setores vazios.')"
                        style="color: red;">Excluir</a>

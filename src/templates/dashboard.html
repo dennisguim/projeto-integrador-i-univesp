@@ -14,7 +14,9 @@
             <li><a href="{{ url_for('listar_setores') }}">Gerenciar Setores</a></li>
             <li><a href="{{ url_for('listar_funcionarios') }}">Gerenciar Funcionários</a></li>
             <li><a href="{{ url_for('listar_usuarios') }}">Gerenciar Usuários</a></li>
+            <li><a href="{{ url_for('status_frequencia') }}">Status dos Lançamentos</a></li>
             <li><a href="{{ url_for('relatorio_geral') }}">Relatório Geral</a></li>
+            <li><a href="{{ url_for('listar_logs') }}">Logs de Auditoria</a></li>
         </ul>
     {% else %}
         <h3>Painel da Chefia</h3>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Logs de Auditoria{% endblock %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Logs de Auditoria e Acesso</h2>
+        <a href="{{ url_for('dashboard') }}"><button type="button">Voltar ao Painel</button></a>
+    </div>
+
+    <p>Exibindo os últimos 500 registros.</p>
+
+    <table border="1" style="width:100%; border-collapse: collapse; font-size: 0.9em;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th width="150">Data/Hora (UTC)</th>
+                <th width="100">Usuário</th>
+                <th width="150">Ação</th>
+                <th>Detalhes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                <td>{{ log.usuario }}</td>
+                <td><strong>{{ log.acao }}</strong></td>
+                <td>{{ log.detalhes }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Painel</a>
+{% endblock %}
