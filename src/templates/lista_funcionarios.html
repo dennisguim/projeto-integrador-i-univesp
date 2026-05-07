@@ -9,8 +9,19 @@
     </div>
 
     {% if current_user.perfil == 'gestor' %}
-        <div style="margin-bottom: 20px;">
-            <a href="{{ url_for('novo_funcionario') }}"><button aria-label="Cadastrar novo funcionário">+ Novo Funcionário</button></a>
+        <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+            <div>
+                <a href="{{ url_for('novo_funcionario') }}"><button aria-label="Cadastrar novo funcionário">+ Novo Funcionário</button></a>
+            </div>
+            
+            <!-- Formulário de Importação -->
+            <div style="border: 1px dashed #0d47a1; padding: 10px; border-radius: 8px; background-color: #e3f2fd;">
+                <form action="{{ url_for('importar_funcionarios_excel') }}" method="post" enctype="multipart/form-data" style="display: flex; align-items: center; gap: 10px;">
+                    <label for="file-upload" style="font-weight: bold; color: #0d47a1; font-size: 0.9em;">Importação em Massa (.xlsx):</label>
+                    <input type="file" name="file" id="file-upload" accept=".xlsx" required style="font-size: 0.8em;">
+                    <button type="submit" style="background-color: #0d47a1; padding: 5px 15px;">Importar</button>
+                </form>
+            </div>
         </div>
     {% endif %}
 
