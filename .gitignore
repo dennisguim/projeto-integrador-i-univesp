@@ -5,3 +5,4 @@ client_secret.json
 .env
 database.db
 planejamento.md
+google-credentials.json
