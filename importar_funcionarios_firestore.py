@@ -51,21 +51,21 @@ def importar_excel_para_firestore(file_path):
 
     # Iterar a partir da linha 2
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        # Validação básica: Setor (col 0), SIAPE (col 3) e Nome (col 4) são obrigatórios
-        if not row[0] or not row[3] or not row[4]:
+        # Validação básica ajustada para os novos índices (A é vazia, então começamos em B=1)
+        if len(row) < 6 or not row[1] or not row[4] or not row[5]:
             continue
 
-        nome_setor = str(row[0]).strip().upper()
-        sigla = str(row[1]).strip().upper() if row[1] else ""
-        lotacao = str(row[2]).strip().upper() if row[2] else ""
-        siape = str(row[3]).strip()
-        nome_func = str(row[4]).strip().upper()
-        jornada = str(row[5]).strip()
-        escala = str(row[6]).strip()
-        remoto_int = str(row[7]).strip()
-        remoto_rev = str(row[8]).strip()
-        chefia_nome = str(row[9]).strip() if row[9] else ""
-        chefia_mat = str(row[10]).strip() if row[10] else ""
+        nome_setor = str(row[1]).strip().upper()
+        sigla = str(row[2]).strip().upper() if row[2] else ""
+        lotacao = str(row[3]).strip().upper() if row[3] else ""
+        siape = str(row[4]).strip()
+        nome_func = str(row[5]).strip().upper()
+        jornada = str(row[6]).strip() if row[6] else ""
+        escala = str(row[7]).strip() if row[7] else ""
+        remoto_int = str(row[8]).strip() if row[8] else "NÃO"
+        remoto_rev = str(row[9]).strip() if row[9] else "NÃO"
+        chefia_nome = str(row[10]).strip() if len(row) > 10 and row[10] else ""
+        chefia_mat = str(row[11]).strip() if len(row) > 11 and row[11] else ""
 
         # 1. Gerenciar Setor
         if nome_setor not in setores_cache:
