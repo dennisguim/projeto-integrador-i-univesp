@@ -4,11 +4,12 @@ import csv
 import tempfile
 import openpyxl
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response, session
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, request, redirect, url_for, flash, make_response, session, abort
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 
 # Importações para Google API
+import firebase_admin
+from firebase_admin import credentials, firestore
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
@@ -18,96 +19,64 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
 
-# Configurações do Google API
+# Configurações do Google API/Firebase
+# O arquivo google-credentials.json deve estar na raiz do projeto (um nível acima de src)
+path_to_creds = os.path.join(os.path.abspath(os.path.join(basedir, os.pardir)), 'google-credentials.json')
+if not firebase_admin._apps:
+    cred = credentials.Certificate(path_to_creds)
+    firebase_admin.initialize_app(cred)
+
+db_fs = firestore.client()
+
+# Configurações do Google API (OAuth)
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file']
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # Apenas para desenvolvimento local (HTTP)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 CLIENT_SECRETS_FILE = os.path.join(os.path.abspath(os.path.join(basedir, os.pardir)), 'client_secret.json')
 
-# Configurações do banco de dados
-#Necessário para login e sessão
+# Configurações do app
 app.config['SECRET_KEY'] = 'uma-chave-secreta-muito-segura'
-# Define o caminho para o arquivo database.db
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
-# Desativar rastreamneto de mod para economizar recursos
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# instancia do bd
-db = SQLAlchemy(app)
 
 # config do flask-login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login' # nome da função da rota de login
+login_manager.login_view = 'login'
 
-# carregar usuário
+# --- MODELOS (Classes para Flask-Login) ----
+class Usuario(UserMixin):
+    def __init__(self, id, nome_usuario, senha, perfil, setor_id=None):
+        self.id = str(id)
+        self.nome_usuario = nome_usuario
+        self.senha = senha
+        self.perfil = perfil
+        self.setor_id = str(setor_id) if setor_id else None
+
+    @staticmethod
+    def get(user_id):
+        doc = db_fs.collection('usuarios').document(str(user_id)).get()
+        if doc.exists:
+            data = doc.to_dict()
+            return Usuario(id=doc.id, **data)
+        return None
+
+# carregar usuário para o Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
-    return Usuario.query.get(int(user_id))
+    return Usuario.get(user_id)
 
-# --- MODELOS (Tabelas) ----
-class Usuario(UserMixin,db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    nome_usuario = db.Column(db.String(80), unique=True, nullable=False)
-    senha = db.Column(db.String(120), nullable=False) # Usar hash num projeto real
-    perfil = db.Column(db.String(50), nullable=False) # Chefia ou Consolidador
-    # adicionado
-    setor_id = db.Column(db.Integer, db.ForeignKey('setor.id'), nullable=True)
-
-    setor_vinculado = db.relationship('Setor', backref='usuarios_gestores')
-
-    def __repr__(self):
-        return f'<Usuario {self.nome_usuario}>'
-
-class Setor(db.Model):
-    # Setores listados na planilha
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(100), nullable=False)
-    sigla = db.Column(db.String(50))
-    lotacao = db.Column(db.String(100))
-    chefia_nome = db.Column(db.String(100))
-    chefia_matricula = db.Column(db.String(50))
-
-    #relacionamento com funcionario
-    funcionarios = db.relationship('Funcionario', backref='setor', lazy=True)
-
-class Funcionario(db.Model):
-    # Dados cadastrais do funcionario
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(150), nullable=False)
-    siape = db.Column(db.String(20), unique=True, nullable=False)
-    lotacao = db.Column(db.String(100)) # Adicionado
-    jornada = db.Column(db.String(50))
-    escala = db.Column(db.String(100))
-    trabalho_remoto_integral = db.Column(db.String(10))
-    dias_remoto_revezamento = db.Column(db.String(50))
-
-    setor_id = db.Column(db.Integer, db.ForeignKey('setor.id'), nullable=False)
-
-    # Relacionamento com Frequencia
-    frequencias = db.relationship('Frequencia', backref='funcionario', lazy=True)
-
-class Frequencia(db.Model):
-    # Registro mensal de frequência
-    id = db.Column(db.Integer, primary_key=True)
-    mes = db.Column(db.String(20), nullable=False)
-    ano = db.Column(db.Integer, nullable=False)
-    frequencia_integral = db.Column(db.String(10))
-    observacoes = db.Column(db.Text)
-
-    funcionario_id = db.Column(db.Integer, db.ForeignKey('funcionario.id'), nullable=False)
-
-class Log(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    data_hora = db.Column(db.DateTime, default=datetime.utcnow)
-    usuario = db.Column(db.String(100))
-    acao = db.Column(db.String(200))
-    detalhes = db.Column(db.Text)
+class FirestoreObj:
+    def __init__(self, id, data):
+        self.id = str(id)
+        for key, value in data.items():
+            setattr(self, key, value)
 
 def registrar_log(acao, detalhes=""):
     usuario_nome = current_user.nome_usuario if current_user.is_authenticated else "Anônimo"
-    novo_log = Log(usuario=usuario_nome, acao=acao, detalhes=detalhes)
-    db.session.add(novo_log)
-    db.session.commit()
+    db_fs.collection('logs').add({
+        'data_hora': firestore.SERVER_TIMESTAMP,
+        'usuario': usuario_nome,
+        'acao': acao,
+        'detalhes': detalhes
+    })
 
 # ---- ROTAS (PÁGINAS) ----
 @app.route('/', methods=['GET', 'POST'])
@@ -119,16 +88,21 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        user = Usuario.query.filter_by(nome_usuario=username).first()
+        # Busca no Firestore
+        users_ref = db_fs.collection('usuarios')
+        query = users_ref.where('nome_usuario', '==', username).limit(1).get()
 
-        # Verificação de senha (posteriormente usar hash)
-        if user and user.senha == password:
-            login_user(user)
-            registrar_log("Login", f"Usuário {username} logou no sistema.")
-            return redirect(url_for('dashboard'))
-        else:
-            registrar_log("Login Falhou", f"Tentativa falha de login para o usuário {username}.")
-            flash('Usuário ou senha inválidos.')
+        if query:
+            user_doc = query[0]
+            data = user_doc.to_dict()
+            if data['senha'] == password:
+                user = Usuario(id=user_doc.id, **data)
+                login_user(user)
+                registrar_log("Login", f"Usuário {username} logou no sistema.")
+                return redirect(url_for('dashboard'))
+        
+        registrar_log("Login Falhou", f"Tentativa falha de login para o usuário {username}.")
+        flash('Usuário ou senha inválidos.')
     
     return render_template('login.html')
 
@@ -154,26 +128,38 @@ def listar_funcionarios():
     ano_ref = request.args.get('ano', 2026, type=int)
 
     # 1. Buscar todos os funcionários acessíveis ao usuário
+    funcs_ref = db_fs.collection('funcionarios')
     if current_user.perfil == 'chefe' and current_user.setor_id:
-        todos_funcionarios = Funcionario.query.filter_by(setor_id=current_user.setor_id).order_by(Funcionario.nome).all()
+        query = funcs_ref.where('setor_id', '==', str(current_user.setor_id)).get()
     else:
-        todos_funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
+        query = funcs_ref.get()
+
+    # Carregar setores para "join"
+    setor_docs = db_fs.collection('setores').get()
+    setores_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in setor_docs}
+
+    todos_funcionarios = []
+    for doc in query:
+        f = FirestoreObj(doc.id, doc.to_dict())
+        f.setor = setores_dict.get(str(f.setor_id))
+        todos_funcionarios.append(f)
+        
+    # Ordenar por nome
+    todos_funcionarios.sort(key=lambda x: x.nome)
 
     # 2. Separar em duas listas: Pendentes e Concluídos
     pendentes = []
     concluidos = []
 
     for func in todos_funcionarios:
-        # Verifica se existe frequência para este funcionário no mês/ano selecionado
-        freq = Frequencia.query.filter_by(
-            funcionario_id=func.id,
-            mes=mes_ref,
-            ano=ano_ref
-        ).first()
+        # Verifica se existe frequência no Firestore
+        freq_query = db_fs.collection('frequencias')\
+            .where('funcionario_id', '==', str(func.id))\
+            .where('mes', '==', mes_ref)\
+            .where('ano', '==', ano_ref).limit(1).get()
 
-        if freq:
-            # Adiciona um atributo temporário para exibir no template se necessário
-            func.freq_registrada = freq 
+        if freq_query:
+            func.freq_registrada = FirestoreObj(freq_query[0].id, freq_query[0].to_dict())
             concluidos.append(func)
         else:
             pendentes.append(func)
@@ -184,13 +170,21 @@ def listar_funcionarios():
                            mes_ref=mes_ref,
                            ano_ref=ano_ref)
 
-@app.route('/funcionarios/frequencia/<int:func_id>', methods=['GET', 'POST'])
+@app.route('/funcionarios/frequencia/<func_id>', methods=['GET', 'POST'])
 @login_required
 def registrar_frequencia(func_id):
-    funcionario = Funcionario.query.get_or_404(func_id)
+    doc = db_fs.collection('funcionarios').document(str(func_id)).get()
+    if not doc.exists:
+        abort(404)
+    funcionario = FirestoreObj(doc.id, doc.to_dict())
+    
+    # Carregar setor
+    setor_doc = db_fs.collection('setores').document(str(funcionario.setor_id)).get()
+    if setor_doc.exists:
+        funcionario.setor = FirestoreObj(setor_doc.id, setor_doc.to_dict())
 
     # verificacao de seguranca. chefe só lança para o seu setor
-    if current_user.perfil == 'chefe' and funcionario.setor_id != current_user.setor_id:
+    if current_user.perfil == 'chefe' and str(funcionario.setor_id) != str(current_user.setor_id):
         flash('Acesso negado: Este funcionário não pertence ao seu setor.')
         return redirect(url_for('listar_funcionarios'))
     
@@ -200,38 +194,36 @@ def registrar_frequencia(func_id):
     
     if request.method == 'POST':
         mes = request.form.get('mes')
-        ano = request.form.get('ano')
+        ano = int(request.form.get('ano'))
         freq_int = request.form.get('frequencia_integral')
         obs = request.form.get('observacoes')
 
         # Verifica se já existe (Evitar duplicidade manual)
-        existente = Frequencia.query.filter_by(
-            funcionario_id=funcionario.id,
-            mes=mes,
-            ano=int(ano)
-        ).first()
+        freq_query = db_fs.collection('frequencias')\
+            .where('funcionario_id', '==', str(funcionario.id))\
+            .where('mes', '==', mes)\
+            .where('ano', '==', ano).limit(1).get()
 
-        if existente:
-             # Atualiza em vez de criar novo (ou avisa erro, dependendo da regra. Aqui vou atualizar)
-             existente.frequencia_integral = freq_int
-             existente.observacoes = obs
+        if freq_query:
+             # Atualiza
+             db_fs.collection('frequencias').document(freq_query[0].id).update({
+                 'frequencia_integral': freq_int,
+                 'observacoes': obs
+             })
              registrar_log("Atualizar Frequência", f"Frequência de {funcionario.nome} ({mes}/{ano}) atualizada.")
              flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) atualizada!')
         else:
             # cria registro de frequencia
-            nova_freq = Frequencia(
-                mes=mes,
-                ano=int(ano),
-                frequencia_integral=freq_int,
-                observacoes=obs,
-                funcionario_id=funcionario.id
-            )
-            db.session.add(nova_freq)
+            db_fs.collection('frequencias').add({
+                'mes': mes,
+                'ano': ano,
+                'frequencia_integral': freq_int,
+                'observacoes': obs,
+                'funcionario_id': str(funcionario.id)
+            })
             registrar_log("Lançar Frequência", f"Frequência de {funcionario.nome} ({mes}/{ano}) registrada.")
             flash(f'Frequência de {funcionario.nome} ({mes}/{ano}) registrada!')
             
-        db.session.commit()
-
         # Retorna para a lista mantendo o filtro de mês/ano
         return redirect(url_for('listar_funcionarios', mes=mes, ano=ano))
     
@@ -258,69 +250,80 @@ def novo_funcionario():
         remoto_integral = request.form.get('remoto_integral')
 
         # salva no banco
-        novo = Funcionario(
-            nome=nome,
-            siape=siape,
-            lotacao=request.form.get('lotacao'),
-            setor_id=int(setor_id),
-            jornada=jornada,
-            escala=escala,
-            trabalho_remoto_integral=remoto_integral,
-            dias_remoto_revezamento="NÃO" # padrão inicial
-        )
-        db.session.add(novo)
-        db.session.commit()
+        db_fs.collection('funcionarios').add({
+            'nome': nome,
+            'siape': siape,
+            'lotacao': request.form.get('lotacao'),
+            'setor_id': str(setor_id),
+            'jornada': jornada,
+            'escala': escala,
+            'trabalho_remoto_integral': remoto_integral,
+            'dias_remoto_revezamento': "NÃO" # padrão inicial
+        })
         registrar_log("Cadastrar Funcionário", f"Funcionário {nome} (SIAPE {siape}) cadastrado.")
 
         flash(f'Funcionário {nome} cadastrado com sucesso!')
         return redirect(url_for('listar_funcionarios'))
     
-    # Sefor GET, mostra o formulário (precisa dos setores para o <select>)
-    setores = Setor.query.all()
+    # Sefor GET, mostra o formulário
+    query = db_fs.collection('setores').get()
+    setores = [FirestoreObj(doc.id, doc.to_dict()) for doc in query]
     return render_template('form_funcionario.html', setores=setores)
 
-@app.route('/funcionarios/editar/<int:id>', methods=['GET', 'POST'])
+@app.route('/funcionarios/editar/<id>', methods=['GET', 'POST'])
 @login_required
 def editar_funcionario(id):
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('listar_funcionarios'))
     
-    func = Funcionario.query.get_or_404(id)
+    doc = db_fs.collection('funcionarios').document(str(id)).get()
+    if not doc.exists:
+        abort(404)
+    func = FirestoreObj(doc.id, doc.to_dict())
     
     if request.method == 'POST':
-        func.nome = request.form.get('nome').upper()
-        func.siape = request.form.get('siape')
-        func.lotacao = request.form.get('lotacao')
-        func.setor_id = int(request.form.get('setor_id'))
-        func.jornada = request.form.get('jornada')
-        func.escala = request.form.get('escala')
-        func.trabalho_remoto_integral = request.form.get('remoto_integral')
+        nome = request.form.get('nome').upper()
+        siape = request.form.get('siape')
         
-        db.session.commit()
-        registrar_log("Editar Funcionário", f"Dados do funcionário {func.nome} (SIAPE {func.siape}) atualizados.")
-        flash(f'Dados de {func.nome} atualizados!')
+        db_fs.collection('funcionarios').document(str(id)).update({
+            'nome': nome,
+            'siape': siape,
+            'lotacao': request.form.get('lotacao'),
+            'setor_id': str(request.form.get('setor_id')),
+            'jornada': request.form.get('jornada'),
+            'escala': request.form.get('escala'),
+            'trabalho_remoto_integral': request.form.get('remoto_integral')
+        })
+        
+        registrar_log("Editar Funcionário", f"Dados do funcionário {nome} (SIAPE {siape}) atualizados.")
+        flash(f'Dados de {nome} atualizados!')
         return redirect(url_for('listar_funcionarios'))
 
-    setores = Setor.query.all()
+    query = db_fs.collection('setores').get()
+    setores = [FirestoreObj(doc.id, doc.to_dict()) for doc in query]
     return render_template('form_funcionario.html', setores=setores, funcionario=func)
 
-@app.route('/funcionarios/excluir/<int:id>')
+@app.route('/funcionarios/excluir/<id>')
 @login_required
 def excluir_funcionario(id):
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('listar_funcionarios'))
     
-    func = Funcionario.query.get_or_404(id)
-    nome = func.nome
-    siape = func.siape
+    doc = db_fs.collection('funcionarios').document(str(id)).get()
+    if not doc.exists:
+        abort(404)
+    data = doc.to_dict()
+    nome = data['nome']
+    siape = data['siape']
     
     # Remove as frequências vinculadas antes de excluir o funcionário
-    Frequencia.query.filter_by(funcionario_id=id).delete()
+    freqs = db_fs.collection('frequencias').where('funcionario_id', '==', str(id)).get()
+    for f_doc in freqs:
+        f_doc.reference.delete()
     
-    db.session.delete(func)
-    db.session.commit()
+    db_fs.collection('funcionarios').document(str(id)).delete()
     registrar_log("Excluir Funcionário", f"Funcionário {nome} (SIAPE {siape}) removido.")
     
     flash(f'Funcionário {nome} removido do sistema.')
@@ -337,39 +340,48 @@ def relatorio_geral():
     # Valores padrão para filtros
     mes_filtro = request.args.get('mes', 'JANEIRO')
     ano_filtro = request.args.get('ano', 2026, type=int)
-    setor_id = request.args.get('setor_id', type=int)
-    nome_busca = request.args.get('nome', '').strip()
+    setor_id = request.args.get('setor_id')
+    nome_busca = request.args.get('nome', '').strip().upper()
     freq_integral_filtro = request.args.get('freq_integral', '')
 
-    # Query Base
-    query = Frequencia.query\
-        .join(Funcionario)\
-        .join(Setor)\
-        .filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
+    # Firestore query
+    freq_ref = db_fs.collection('frequencias')\
+        .where('mes', '==', mes_filtro)\
+        .where('ano', '==', ano_filtro)
     
-    # Filtros Adicionais
-    if setor_id:
-        query = query.filter(Funcionario.setor_id == setor_id)
+    freq_docs = freq_ref.get()
     
-    if nome_busca:
-        # Filtra por Nome ou SIAPE
-        query = query.filter(
-            (Funcionario.nome.contains(nome_busca.upper())) | 
-            (Funcionario.siape.contains(nome_busca))
-        )
+    resultados = []
+    # Carregar todos os funcionários e setores para "join" em memória
+    func_docs = db_fs.collection('funcionarios').get()
+    funcs_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in func_docs}
     
-    if freq_integral_filtro:
-        query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
+    setor_docs = db_fs.collection('setores').get()
+    setores_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in setor_docs}
+    
+    for f_doc in freq_docs:
+        freq = FirestoreObj(f_doc.id, f_doc.to_dict())
+        func = funcs_dict.get(str(freq.funcionario_id))
+        
+        if not func: continue
+        
+        # Aplicar filtros
+        if setor_id and str(func.setor_id) != str(setor_id): continue
+        if nome_busca and (nome_busca not in func.nome.upper() and nome_busca not in func.siape): continue
+        if freq_integral_filtro and freq.frequencia_integral != freq_integral_filtro: continue
+        
+        # Vincular objetos para o template
+        func.setor = setores_dict.get(str(func.setor_id))
+        freq.funcionario = func
+        resultados.append(freq)
 
-    resultados = query.all()
-    setores = Setor.query.order_by(Setor.nome).all()
+    setores = sorted(setores_dict.values(), key=lambda x: x.nome)
 
-    # Passamos os filtros atuais para manter o formulário preenchido
     filtros_atuais = {
         'mes': mes_filtro,
         'ano': ano_filtro,
         'setor_id': setor_id,
-        'nome': nome_busca,
+        'nome': request.args.get('nome', ''),
         'freq_integral': freq_integral_filtro
     }
 
@@ -387,16 +399,33 @@ def exportar_relatorio():
     # 1. Recuperar dados filtrados
     mes_filtro = request.args.get('mes')
     ano_filtro = request.args.get('ano', type=int)
-    setor_id = request.args.get('setor_id', type=int)
-    nome_busca = request.args.get('nome', '').strip()
+    setor_id = request.args.get('setor_id')
+    nome_busca = request.args.get('nome', '').strip().upper()
     freq_integral_filtro = request.args.get('freq_integral', '')
 
-    query = Frequencia.query.join(Funcionario).join(Setor).filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
-    if setor_id: query = query.filter(Funcionario.setor_id == setor_id)
-    if nome_busca: query = query.filter((Funcionario.nome.contains(nome_busca.upper())) | (Funcionario.siape.contains(nome_busca)))
-    if freq_integral_filtro: query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
-
-    resultados = query.all()
+    # Lógica idêntica ao relatorio_geral para buscar dados
+    freq_docs = db_fs.collection('frequencias')\
+        .where('mes', '==', mes_filtro)\
+        .where('ano', '==', ano_filtro).get()
+    
+    func_docs = db_fs.collection('funcionarios').get()
+    funcs_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in func_docs}
+    
+    setor_docs = db_fs.collection('setores').get()
+    setores_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in setor_docs}
+    
+    resultados = []
+    for f_doc in freq_docs:
+        freq = FirestoreObj(f_doc.id, f_doc.to_dict())
+        func = funcs_dict.get(str(freq.funcionario_id))
+        if not func: continue
+        if setor_id and str(func.setor_id) != str(setor_id): continue
+        if nome_busca and (nome_busca not in func.nome.upper() and nome_busca not in func.siape): continue
+        if freq_integral_filtro and freq.frequencia_integral != freq_integral_filtro: continue
+        
+        func.setor = setores_dict.get(str(func.setor_id))
+        freq.funcionario = func
+        resultados.append(freq)
 
     # 2. Manipular Excel com Modelo Local
     caminho_modelo = os.path.join(app.static_folder, 'modelo_frequencia.xlsx')
@@ -408,12 +437,11 @@ def exportar_relatorio():
     if num_registros > 188:
         ws.insert_rows(193, num_registros - 188)
 
-    # Preencher dados (B=2 até L=12)
-    # Ordem: SETOR;SIGLA;LOTAÇÃO;SIAPE;NOME;JORNADA;ESCALA;REMOTO_INT;REMOTO_REV;FREQ_INT;OBS
+    # Preencher dados
     for i, freq in enumerate(resultados):
         row = 5 + i
-        ws.cell(row=row, column=2).value = freq.funcionario.setor.nome
-        ws.cell(row=row, column=3).value = freq.funcionario.setor.sigla
+        ws.cell(row=row, column=2).value = freq.funcionario.setor.nome if freq.funcionario.setor else ""
+        ws.cell(row=row, column=3).value = freq.funcionario.setor.sigla if freq.funcionario.setor else ""
         ws.cell(row=row, column=4).value = freq.funcionario.lotacao
         ws.cell(row=row, column=5).value = freq.funcionario.siape
         ws.cell(row=row, column=6).value = freq.funcionario.nome
@@ -434,93 +462,137 @@ def exportar_relatorio():
     response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return response
 
-@app.route('/setores/excluir/<int:id>')
+@app.route('/setores/excluir/<id>')
 @login_required
 def excluir_setor(id):
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-    
-    setor = Setor.query.get_or_404(id)
-    nome = setor.nome
-    
+
+    doc = db_fs.collection('setores').document(str(id)).get()
+    if not doc.exists: abort(404)
+    nome = doc.to_dict()['nome']
+
     # Verifica se tem funcionários
-    if setor.funcionarios:
+    funcs = db_fs.collection('funcionarios').where('setor_id', '==', str(id)).limit(1).get()
+    if funcs:
         flash('Erro: Não é possível excluir um setor que possui funcionários vinculados.')
     else:
-        db.session.delete(setor)
-        db.session.commit()
+        db_fs.collection('setores').document(str(id)).delete()
         registrar_log("Excluir Setor", f"Setor {nome} removido.")
-        flash(f'Setor {setor.nome} excluído.')
-        
+        flash(f'Setor {nome} excluído.')
+
     return redirect(url_for('listar_setores'))
 
 @app.route('/setores')
 @login_required
 def listar_setores():
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-    lista = Setor.query.all()
+    query = db_fs.collection('setores').get()
+    lista = [FirestoreObj(doc.id, doc.to_dict()) for doc in query]
+    lista.sort(key=lambda x: x.nome)
     return render_template('lista_setores.html', setores=lista)
 
 @app.route('/setores/novo', methods=['GET', 'POST'])
 @login_required
 def novo_setor():
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-    
+
     if request.method == 'POST':
-        novo = Setor(
-            nome=request.form.get('nome'),
-            sigla=request.form.get('sigla'),
-            chefia_nome=request.form.get('chefia_nome'),
-            chefia_matricula=request.form.get('chefia_matricula')
-        )
-        db.session.add(novo)
-        db.session.commit()
-        registrar_log("Cadastrar Setor", f"Setor {novo.nome} ({novo.sigla}) cadastrado.")
+        nome = request.form.get('nome')
+        sigla = request.form.get('sigla')
+        db_fs.collection('setores').add({
+            'nome': nome,
+            'sigla': sigla,
+            'chefia_nome': request.form.get('chefia_nome'),
+            'chefia_matricula': request.form.get('chefia_matricula')
+        })
+        registrar_log("Cadastrar Setor", f"Setor {nome} ({sigla}) cadastrado.")
         flash('Setor criado!')
         return redirect(url_for('listar_setores'))
-    
+
     return render_template('form_setor.html')
 
-@app.route('/setores/editar/<int:id>', methods=['GET', 'POST'])
+@app.route('/setores/editar/<id>', methods=['GET', 'POST'])
 @login_required
 def editar_setor(id):
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-    
-    setor = Setor.query.get_or_404(id)
-    
+
+    doc = db_fs.collection('setores').document(str(id)).get()
+    if not doc.exists: abort(404)
+    setor = FirestoreObj(doc.id, doc.to_dict())
+
     if request.method == 'POST':
-        setor.nome = request.form.get('nome')
-        setor.sigla = request.form.get('sigla')
-        setor.chefia_nome = request.form.get('chefia_nome')
-        setor.chefia_matricula = request.form.get('chefia_matricula')
-        
-        db.session.commit()
-        registrar_log("Editar Setor", f"Setor {setor.nome} ({setor.sigla}) atualizado.")
-        flash(f'Setor {setor.nome} atualizado!')
+        nome = request.form.get('nome')
+        sigla = request.form.get('sigla')
+        db_fs.collection('setores').document(str(id)).update({
+            'nome': nome,
+            'sigla': sigla,
+            'chefia_nome': request.form.get('chefia_nome'),
+            'chefia_matricula': request.form.get('chefia_matricula')
+        })
+
+        registrar_log("Editar Setor", f"Setor {nome} ({sigla}) atualizado.")
+        flash(f'Setor {nome} atualizado!')
         return redirect(url_for('listar_setores'))
-    
+
     return render_template('form_setor.html', setor=setor)
 
 @app.route('/usuarios/novo', methods=['GET', 'POST'])
 @login_required
 def novo_usuario():
     if current_user.perfil != 'gestor': return redirect(url_for('dashboard'))
-    
+
     if request.method == 'POST':
         username = request.form.get('username')
-        novo_user = Usuario(
-            nome_usuario=username,
-            senha=request.form.get('password'),
-            perfil=request.form.get('perfil'),
-            setor_id=request.form.get('setor_id') if request.form.get('setor_id') else None
-        )
-        db.session.add(novo_user)
-        db.session.commit()
+        db_fs.collection('usuarios').add({
+            'nome_usuario': username,
+            'senha': request.form.get('password'),
+            'perfil': request.form.get('perfil'),
+            'setor_id': str(request.form.get('setor_id')) if request.form.get('setor_id') else None
+        })
         registrar_log("Cadastrar Usuário", f"Usuário {username} criado.")
         flash('Usuário criado com sucesso!')
         return redirect(url_for('listar_usuarios'))
-        
-    setores = Setor.query.all()
+
+    query = db_fs.collection('setores').get()
+    setores = sorted([FirestoreObj(doc.id, doc.to_dict()) for doc in query], key=lambda x: x.nome)
     return render_template('form_usuario.html', setores=setores)
+
+@app.route('/usuarios/editar/<id>', methods=['GET', 'POST'])
+@login_required
+def editar_usuario(id):
+    if current_user.perfil != 'gestor':
+        flash('Acesso negado.')
+        return redirect(url_for('dashboard'))
+
+    doc = db_fs.collection('usuarios').document(str(id)).get()
+    if not doc.exists: abort(404)
+    usuario = FirestoreObj(doc.id, doc.to_dict())
+
+    if request.method == 'POST':
+        novo_username = request.form.get('username')
+        novo_perfil = request.form.get('perfil')
+        novo_setor_id = request.form.get('setor_id')
+
+        # Verificar duplicidade se mudar username
+        if novo_username != usuario.nome_usuario:
+            exist = db_fs.collection('usuarios').where('nome_usuario', '==', novo_username).limit(1).get()
+            if exist:
+                flash('Erro: Este nome de usuário já está em uso.')
+                return redirect(url_for('editar_usuario', id=id))
+
+        db_fs.collection('usuarios').document(str(id)).update({
+            'nome_usuario': novo_username,
+            'perfil': novo_perfil,
+            'setor_id': str(novo_setor_id) if novo_setor_id else None
+        })
+
+        registrar_log("Editar Usuário", f"Dados do usuário {novo_username} atualizados.")
+        flash(f'Dados de {novo_username} atualizados com sucesso!')
+        return redirect(url_for('listar_usuarios'))
+
+    query = db_fs.collection('setores').get()
+    setores = sorted([FirestoreObj(doc.id, doc.to_dict()) for doc in query], key=lambda x: x.nome)
+    return render_template('form_usuario.html', setores=setores, usuario=usuario)
 
 @app.route('/usuarios')
 @login_required
@@ -528,45 +600,48 @@ def listar_usuarios():
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
-    
-    lista = Usuario.query.all()
+
+    query = db_fs.collection('usuarios').get()
+    lista = [FirestoreObj(doc.id, doc.to_dict()) for doc in query]
+    lista.sort(key=lambda x: x.nome_usuario)
     return render_template('lista_usuarios.html', usuarios=lista)
 
-@app.route('/usuarios/excluir/<int:id>')
+@app.route('/usuarios/excluir/<id>')
 @login_required
 def excluir_usuario(id):
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
-    
-    if id == current_user.id:
+
+    if str(id) == str(current_user.id):
         flash('Erro: Você não pode excluir seu próprio usuário.')
         return redirect(url_for('listar_usuarios'))
 
-    user = Usuario.query.get_or_404(id)
-    nome = user.nome_usuario
-    db.session.delete(user)
-    db.session.commit()
+    doc = db_fs.collection('usuarios').document(str(id)).get()
+    if not doc.exists: abort(404)
+    nome = doc.to_dict()['nome_usuario']
+    db_fs.collection('usuarios').document(str(id)).delete()
     registrar_log("Excluir Usuário", f"Usuário {nome} removido.")
-    
+
     flash(f'Usuário {nome} excluído com sucesso.')
     return redirect(url_for('listar_usuarios'))
 
-@app.route('/usuarios/alterar_senha/<int:id>', methods=['GET', 'POST'])
+@app.route('/usuarios/alterar_senha/<id>', methods=['GET', 'POST'])
 @login_required
 def admin_alterar_senha(id):
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
 
-    user = Usuario.query.get_or_404(id)
+    doc = db_fs.collection('usuarios').document(str(id)).get()
+    if not doc.exists: abort(404)
+    user = FirestoreObj(doc.id, doc.to_dict())
 
     if request.method == 'POST':
         nova_senha = request.form.get('nova_senha')
         if nova_senha:
-            user.senha = nova_senha # Em produção usar hash
-            db.session.commit()
-            registrar_log("Alterar Senha (Admin)", f"Senha do usuário {user.nome_usuario} alterada pelo administrador.")
+            db_fs.collection('usuarios').document(str(id)).update({'senha': nova_senha})
+            registrar_log("Alterar Senha (Admin)", f"Senha do usuário {user.nome_usuario} alterada.")
             flash(f'Senha de {user.nome_usuario} alterada com sucesso!')
             return redirect(url_for('listar_usuarios'))
         else:
@@ -589,12 +664,11 @@ def minha_senha():
         elif not nova_senha:
              flash('A nova senha não pode ser vazia.')
         else:
-            current_user.senha = nova_senha
-            db.session.commit()
+            db_fs.collection('usuarios').document(str(current_user.id)).update({'senha': nova_senha})
             registrar_log("Alterar Senha", "O próprio usuário alterou sua senha.")
             flash('Sua senha foi alterada com sucesso!')
             return redirect(url_for('dashboard'))
-            
+
     return render_template('minha_senha.html')
 
 @app.route('/status_frequencia')
@@ -603,32 +677,35 @@ def status_frequencia():
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
-    
+
     mes_ref = request.args.get('mes', 'JANEIRO')
     ano_ref = request.args.get('ano', 2026, type=int)
-    
-    setores = Setor.query.order_by(Setor.nome).all()
+
+    setor_docs = db_fs.collection('setores').get()
+    func_docs = db_fs.collection('funcionarios').get()
+    freq_docs = db_fs.collection('frequencias').where('mes', '==', mes_ref).where('ano', '==', ano_ref).get()
+
+    # Mapear funcionários por setor
+    funcs_por_setor = {}
+    for f in func_docs:
+        s_id = str(f.to_dict().get('setor_id'))
+        if s_id not in funcs_por_setor: funcs_por_setor[s_id] = []
+        funcs_por_setor[s_id].append(f.id)
+
+    # Mapear frequências por funcionário
+    freqs_lancadas = {str(f.to_dict().get('funcionario_id')) for f in freq_docs}
+
     status_setores = []
-    
-    for s in setores:
-        total_funcionarios = len(s.funcionarios)
+    for s_doc in setor_docs:
+        s = FirestoreObj(s_doc.id, s_doc.to_dict())
+        ids_funcs = funcs_por_setor.get(str(s.id), [])
+        total_funcionarios = len(ids_funcs)
+
         if total_funcionarios == 0:
-            status_setores.append({
-                'setor': s,
-                'total': 0,
-                'lancados': 0,
-                'pendentes': 0,
-                'concluido': True
-            })
+            status_setores.append({'setor': s, 'total': 0, 'lancados': 0, 'pendentes': 0, 'concluido': True})
             continue
-            
-        # Conta quantos funcionários deste setor têm frequência no mês/ano
-        lancados = Frequencia.query.join(Funcionario).filter(
-            Funcionario.setor_id == s.id,
-            Frequencia.mes == mes_ref,
-            Frequencia.ano == ano_ref
-        ).count()
-        
+
+        lancados = sum(1 for f_id in ids_funcs if str(f_id) in freqs_lancadas)
         status_setores.append({
             'setor': s,
             'total': total_funcionarios,
@@ -636,11 +713,9 @@ def status_frequencia():
             'pendentes': total_funcionarios - lancados,
             'concluido': (lancados >= total_funcionarios)
         })
-        
-    return render_template('status_frequencia.html', 
-                           status=status_setores, 
-                           mes_ref=mes_ref, 
-                           ano_ref=ano_ref)
+
+    status_setores.sort(key=lambda x: x['setor'].nome)
+    return render_template('status_frequencia.html', status=status_setores, mes_ref=mes_ref, ano_ref=ano_ref)
 
 @app.route('/logs')
 @login_required
@@ -648,39 +723,34 @@ def listar_logs():
     if current_user.perfil != 'gestor':
         flash('Acesso negado.')
         return redirect(url_for('dashboard'))
-    
-    logs = Log.query.order_by(Log.data_hora.desc()).limit(500).all()
+
+    # Logs ordenados por data decrescente
+    logs_query = db_fs.collection('logs').order_by('data_hora', direction=firestore.Query.DESCENDING).limit(500).get()
+    logs = [FirestoreObj(doc.id, doc.to_dict()) for doc in logs_query]
     return render_template('lista_logs.html', logs=logs)
 
 @app.route('/google/login')
 @login_required
 def google_login():
     if not os.path.exists(CLIENT_SECRETS_FILE):
-        flash("Arquivo 'client_secret.json' não encontrado na raiz do projeto. Verifique o guia 'google-planilhas.md'.")
+        flash("Arquivo 'client_secret.json' não encontrado. Verifique o guia 'google-planilhas.md'.")
         return redirect(url_for('relatorio_geral'))
 
-    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE, scopes=SCOPES)
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES)
     flow.redirect_uri = url_for('google_callback', _external=True)
-    
     authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true')
     session['state'] = state
     session['google_filters'] = request.args.to_dict()
-    
     return redirect(authorization_url)
 
 @app.route('/google/callback')
 def google_callback():
     state = session.get('state')
-    if not state:
-        return redirect(url_for('relatorio_geral'))
+    if not state: return redirect(url_for('relatorio_geral'))
 
-    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
     flow.redirect_uri = url_for('google_callback', _external=True)
-
-    authorization_response = request.url
-    flow.fetch_token(authorization_response=authorization_response)
+    flow.fetch_token(authorization_response=request.url)
 
     credentials = flow.credentials
     session['google_credentials'] = {
@@ -691,9 +761,7 @@ def google_callback():
         'client_secret': credentials.client_secret,
         'scopes': credentials.scopes
     }
-
-    filtros = session.get('google_filters', {})
-    return redirect(url_for('exportar_google_sheets', **filtros))
+    return redirect(url_for('exportar_google_sheets', **session.get('google_filters', {})))
 
 @app.route('/relatorio/google-sheets')
 @login_required
@@ -701,46 +769,44 @@ def exportar_google_sheets():
     if 'google_credentials' not in session:
         return redirect(url_for('google_login', **request.args))
 
-    # 1. Recuperar dados filtrados
+    # Reutiliza a lógica de busca do relatório geral (simplificada aqui)
     mes_filtro = request.args.get('mes')
     ano_filtro = request.args.get('ano', type=int)
-    setor_id = request.args.get('setor_id', type=int)
-    nome_busca = request.args.get('nome', '').strip()
+    setor_id = request.args.get('setor_id')
+    nome_busca = request.args.get('nome', '').strip().upper()
     freq_integral_filtro = request.args.get('freq_integral', '')
 
-    query = Frequencia.query.join(Funcionario).join(Setor).filter(Frequencia.mes == mes_filtro, Frequencia.ano == ano_filtro)
-    if setor_id: query = query.filter(Funcionario.setor_id == setor_id)
-    if nome_busca: query = query.filter((Funcionario.nome.contains(nome_busca.upper())) | (Funcionario.siape.contains(nome_busca)))
-    if freq_integral_filtro: query = query.filter(Frequencia.frequencia_integral == freq_integral_filtro)
+    freq_docs = db_fs.collection('frequencias').where('mes', '==', mes_filtro).where('ano', '==', ano_filtro).get()
+    func_docs = db_fs.collection('funcionarios').get()
+    funcs_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in func_docs}
+    setor_docs = db_fs.collection('setores').get()
+    setores_dict = {doc.id: FirestoreObj(doc.id, doc.to_dict()) for doc in setor_docs}
 
-    resultados = query.all()
+    resultados = []
+    for f_doc in freq_docs:
+        freq = FirestoreObj(f_doc.id, f_doc.to_dict())
+        func = funcs_dict.get(str(freq.funcionario_id))
+        if not func: continue
+        if setor_id and str(func.setor_id) != str(setor_id): continue
+        if nome_busca and (nome_busca not in func.nome.upper() and nome_busca not in func.siape): continue
+        if freq_integral_filtro and freq.frequencia_integral != freq_integral_filtro: continue
+        func.setor = setores_dict.get(str(func.setor_id))
+        freq.funcionario = func
+        resultados.append(freq)
 
     if not resultados:
         flash("Nenhum registro encontrado para exportar.")
         return redirect(url_for('relatorio_geral', **request.args))
 
-    # 2. Manipular Excel com Modelo Local
+    # Manipular Excel e Upload (Usa o service account para o Drive se preferir, ou OAuth)
     caminho_modelo = os.path.join(app.static_folder, 'modelo_frequencia.xlsx')
-    if not os.path.exists(caminho_modelo):
-        flash(f"Modelo Excel não encontrado em {caminho_modelo}")
-        return redirect(url_for('relatorio_geral', **request.args))
-
     wb = openpyxl.load_workbook(caminho_modelo)
     ws = wb.active
-
-    # Se houver mais de 188 registros (5 a 192), insere linhas extras mantendo as instruções
-    num_registros = len(resultados)
-    limite_padrao = 188
-    if num_registros > limite_padrao:
-        linhas_extras = num_registros - limite_padrao
-        ws.insert_rows(193, linhas_extras) # Insere a partir da 193 (antes das instruções)
-
-    # Preencher dados (B=2 até L=12)
-    # Ordem: SETOR;SIGLA;LOTAÇÃO;SIAPE;NOME;JORNADA;ESCALA;REMOTO_INT;REMOTO_REV;FREQ_INT;OBS
+    # ... (preenchimento idêntico ao exportar_relatorio) ...
     for i, freq in enumerate(resultados):
         row = 5 + i
-        ws.cell(row=row, column=2).value = freq.funcionario.setor.nome
-        ws.cell(row=row, column=3).value = freq.funcionario.setor.sigla
+        ws.cell(row=row, column=2).value = freq.funcionario.setor.nome if freq.funcionario.setor else ""
+        ws.cell(row=row, column=3).value = freq.funcionario.setor.sigla if freq.funcionario.setor else ""
         ws.cell(row=row, column=4).value = freq.funcionario.lotacao
         ws.cell(row=row, column=5).value = freq.funcionario.siape
         ws.cell(row=row, column=6).value = freq.funcionario.nome
@@ -751,37 +817,23 @@ def exportar_google_sheets():
         ws.cell(row=row, column=11).value = freq.frequencia_integral
         ws.cell(row=row, column=12).value = freq.observacoes
 
-    # Salva em arquivo temporário
     with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
         temp_path = tmp.name
         wb.save(temp_path)
 
-    # 3. Upload e Conversão para Google Sheets
     try:
         creds = google.oauth2.credentials.Credentials(**session['google_credentials'])
-        # Build Drive service to upload file
         drive_service = build('drive', 'v3', credentials=creds)
-        
-        file_metadata = {
-            'name': f'Relatório Frequência {mes_filtro}-{ano_filtro}',
-            'mimeType': 'application/vnd.google-apps.spreadsheet' # Conversão automática
-        }
-        media = MediaFileUpload(temp_path, 
-                                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                                resumable=True)
-        
+        file_metadata = {'name': f'Frequência {mes_filtro}-{ano_filtro}', 'mimeType': 'application/vnd.google-apps.spreadsheet'}
+        media = MediaFileUpload(temp_path, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', resumable=True)
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        
-        flash(f'Sucesso! Planilha criada no seu Google Drive (ID: {file.get("id")})')
+        flash(f'Sucesso! Planilha criada no seu Google Drive!')
     except Exception as e:
         flash(f'Erro ao salvar no Google Drive: {str(e)}')
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if os.path.exists(temp_path): os.remove(temp_path)
 
     return redirect(url_for('relatorio_geral', **request.args))
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
