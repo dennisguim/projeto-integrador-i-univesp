@@ -1,6 +1,6 @@
-# Sistema de Controle de Frequência - INCA HCIII
+# Sistema de Controle de Frequência - TimeGov
 
-Este projeto é uma solução web desenvolvida para automatizar e padronizar o processo de consolidação da frequência mensal dos servidores da Divisão de Enfermagem do **Hospital do Câncer III (HCIII)** do **Instituto Nacional de Câncer (INCA)**.
+Este projeto é uma solução web desenvolvida para automatizar e padronizar o processo de consolidação da frequência mensal dos servidores da Divisão de Enfermagem de um Instituto de Câncer.
 
 O objetivo principal é substituir o processo manual fragmentado de 10 setores distintos por um sistema centralizado que gere relatórios automáticos conforme as exigências do RH.
 
@@ -88,4 +88,4 @@ O projeto aplica conhecimentos práticos de:
 
 ## Licença
 
-Este projeto é de caráter acadêmico e destinado ao uso interno do INCA HCIII.
+Este projeto é de caráter acadêmico e destinado ao uso interno.
