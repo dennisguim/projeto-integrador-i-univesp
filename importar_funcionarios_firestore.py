@@ -113,7 +113,7 @@ def importar_excel_para_firestore(file_path):
     print("-" * 30)
 
 if __name__ == "__main__":
-    file_name = "planilha_importacao_modelo.xlsx"
+    file_name = "src/static/planilha_importacao_modelo.xlsx"
     if len(sys.argv) > 1:
         file_name = sys.argv[1]
     

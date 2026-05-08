@@ -21,6 +21,11 @@
                     <input type="file" name="file" id="file-upload" accept=".xlsx" required style="font-size: 0.8em;">
                     <button type="submit" style="background-color: #0d47a1; padding: 5px 15px;">Importar</button>
                 </form>
+                <div style="margin-top: 5px; text-align: center;">
+                    <a href="{{ url_for('static', filename='planilha_importacao_modelo.xlsx') }}" style="font-size: 0.85em; color: #0d47a1; font-weight: bold; text-decoration: none;">
+                        ⬇ Faça o Download do Modelo
+                    </a>
+                </div>
             </div>
         </div>
     {% endif %}
